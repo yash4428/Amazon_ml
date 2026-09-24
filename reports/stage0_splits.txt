@@ -1,0 +1,48 @@
+Split 'val' written to splits/val/
+{
+  "train_s1": 1765458,
+  "train_s2": 4026296,
+  "train_s3": 4229194,
+  "val_s1": 441363,
+  "val_s2": 1008320,
+  "val_s3": 1056409
+}
+  pipeline train dir : splits/val/train   (files named train_*.tsv)
+  pipeline test dir  : splits/val/test   (files named test_*.tsv)
+  hidden answers     : splits/val/val_ground_truth.tsv   (ONLY evaluate.py reads this)
+Split 'val2' written to splits/val2/
+{
+  "train_s1": 1765458,
+  "train_s2": 4027023,
+  "train_s3": 4228537,
+  "val_s1": 441363,
+  "val_s2": 1007593,
+  "val_s3": 1057066
+}
+  pipeline train dir : splits/val2/train   (files named train_*.tsv)
+  pipeline test dir  : splits/val2/test   (files named test_*.tsv)
+  hidden answers     : splits/val2/val_ground_truth.tsv   (ONLY evaluate.py reads this)
+Split 'loco_india' written to splits/loco_india/
+{
+  "train_s1": 1323633,
+  "train_s2": 3016817,
+  "train_s3": 3170056,
+  "val_s1": 883188,
+  "val_s2": 2017799,
+  "val_s3": 2115547
+}
+  pipeline train dir : splits/loco_india/train   (files named train_*.tsv)
+  pipeline test dir  : splits/loco_india/test   (files named test_*.tsv)
+  hidden answers     : splits/loco_india/val_ground_truth.tsv   (ONLY evaluate.py reads this)
+Split 'loco_us' written to splits/loco_us/
+{
+  "train_s1": 883188,
+  "train_s2": 2017799,
+  "train_s3": 2115547,
+  "val_s1": 1323633,
+  "val_s2": 3016817,
+  "val_s3": 3170056
+}
+  pipeline train dir : splits/loco_us/train   (files named train_*.tsv)
+  pipeline test dir  : splits/loco_us/test   (files named test_*.tsv)
+  hidden answers     : splits/loco_us/val_ground_truth.tsv   (ONLY evaluate.py reads this)

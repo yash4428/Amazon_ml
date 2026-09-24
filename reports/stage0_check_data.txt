@@ -1,0 +1,159 @@
+======================================================================
+DATA PROFILE
+======================================================================
+S1: 2206821 records | countries: {'US': 1323633, 'India': 883188}
+S2: 5034616 records | countries: {'India': 2017799, 'US': 3016817}
+S3: 5285603 records | countries: {'US': 3170056, 'India': 2115547}
+
+Ground truth rows: 2206821
+
+Singleton rate (S1 with no matches): 123247/2206821 = 0.056
+  -> predicting EMPTY for everything scores exactly this on validation.
+  India: 883188 S1, singleton rate 0.056
+  US: 1323633 S1, singleton rate 0.056
+
+Matches per S1 entity (count: #entities):
+  0: 123247
+  1: 119157
+  2: 375212
+  3: 530841
+  4: 484115
+  5: 321957
+  6: 164868
+  7: 63968
+  8: 18680
+  9: 4205
+  10: 534
+  11: 37
+
+Which sources the matches come from: {'S2+S3': 1776047, 'S3': 164498, 'none': 123247, 'S2': 143029}
+
+S2/S3 ids appearing in >1 S1 match list: 0   -> ONE-TO-ONE ASSIGNMENT IS SAFE
+S2/S3 records matched to NO S1 (distractors): 2681854/10320219 = 0.260
+S1 entities with >1 match from the SAME source: 1694736  (sources 2/3 are NOT deduplicated)
+
+True pairs with same country label: 7638365/7638365   -> blocking within country is SAFE
+True pairs with exactly equal normalised name: 1668793/7638365
+Empty fields across all sources: {'business_address': 344883}
+
+Sample true matches:
+
+  S1-13345903 [India] OTE Food Pvt Ltd | 7 Manjusar Gidc Savli, Vadodara, Gujarat
+    S2-660714211 [India] OTE Ltd Pvt  Food | NO 5 MANJUSAR GIDC SAVLI, VADODARA, Gujarat
+    S2-989536606 [India] OTE Food Pvt | 5 MANJUSAR GIDC SAVLI, VADODARA, Gujarat
+    S3-743762975 [India] Pvt OTE Fdr Ltd | Door No 7 Manjusar Gidc Savli, Vadodara, ગુજરાત
+
+  S1-472861943 [US] Ruperta Templin, L.C.S.W., PC | 6605 Jockey Club Drive, Whitsett, NC
+    S2-391906196 [US] Ruperta Templin, L.C.S.W., | 6605 Jockey Club Drive, WHITSETT, NC
+    S2-559016099 [US] Ruperta Templin, | WHITSETT, 6605 JOCKEY CLUB DRIVE, NC
+    S2-737298187 [US] Ruperta Templiisgt, L.C.S.W., PC | 6605 JOCKEY CLUB DRIVE, WHITSETT, NC
+    S3-84489645 [US] Ruperta Ruperta Témplin, L.C.S.W., PC | 6605 Jockey Club Dr, Whitsett, North Carolina
+
+  S1-28767430 [US] Murillo and Putt LLC | 1610 Park Towne Ln NE, Unit 8, Cedar Rapids, IA
+    S2-792189988 [US] Muri1lo and Putt LLC | 1610 PARK TOWNE LN NE, CEDAR RAPIDS, IA
+    S3-129637978 [US] LLC Murillo and Putt | Cedar Rapids, Unit 8, Park Towne Ln NE, Iowa
+    S3-326379716 [US] Murillo & Putt LLC Services | Iowa, 1610- Park Towne Ln NE, Unit 8, Cedar Rapids
+
+  S1-166375802 [US] Classic Platinum Paceline Inc. | 29 Carriage Crossing, Middletown, CT
+    S3-239265708 [US] Classic Paltinum Paceline Inc. | 29 Carriage Xing, Middletown, Connecticut
+
+  S1-708269393 [US] Satterlee, Tupper and Godbey Corp | Salem, 1300 Broadway Street, Unit 306, OR
+    S2-872996502 [US] Satterlee, Tupper and | 1300 BROADWAY STREET, SALEM, OR
+    S3-116297899 [US] Satterlee, Tupper  and Godbey Corp | 1300 Broadway St, Unit 306, Salem, Oregon
+    S3-3817734 [US] Satterlee Tupper And Godbey Corp | 1300 Broadway St, Unit 306, Salem, Oregon
+    S3-460410707 [US] Satterlee | 1300 Broadway Street, Unit 306, Salem, OR
+
+  S1-979451145 [US] Renae Foster Pegasus | NY, Brookhaven, 95 Church Street
+    S2-257921820 [US] Renae Foster  Pegasus Ltd | 95 CHURCH ST, BROOKHAVEN, NY
+    S2-367138284 [US] renaefosterpegasus.com | 95 Church St, BROOKHAVEN, NY
+    S2-572179148 [US] pegasusfoster.com | 95 CHURCH SAINT, LAKE RONKONKOMA, NY
+    S2-92947258 [US] Renae Foster Pegasus Inc | 
+    S3-36309492 [US] Renae Foster Pegasus-LP | ##95 Church St, NULL, Ronkonnkoma, New York
+    S3-364615122 [US] Renae Foster Pegasus Co | NULL, Ronkonnkoma, New York, ##95 Church St
+
+  S1-933101824 [India] Shiva Energy | No 130 Ground Floor Seniamman Koil Street Tondiarpet, Chennai, Tamil Nadu
+    S2-245375483 [India] சிவா எனர்ஜி | MADRAS, CHENNAI, தமிழ்நாடு, H.NO 130 GROUSD FLOOR SENIAMMAN KOIL STREET TONDIARPET
+    S2-736142000 [India] சிவா எனர்ஜி | 130 GROUND FLOOR SENIAMMAN KOIL STREET TONDIARPET, CHENNAI, MADRAS, Tamil Nadu
+    S3-505315151 [India] சிவா எனர்ஜி | Door No 130 Ground Floor Seniamman Koil Street Tondiarpet, Chennai, TN, Chennai
+    S3-5383533 [India] SHIVA ENERGY | No 130 Ground Floor Seniamman Koil Street Tondiarpet, Chennai, TN
+    S3-905697392 [India] Shiva Énergy | H.no 130 Ground Floor Seniamman Koil Street Tondiarpet, Chennai, தமிழ்நாடு
+
+  S1-584724602 [India] Global Management Private Limited | R No 1 Maya Nagarb G Kher Road Worli, Mumbai, Maharashtra
+    S2-202058686 [India] ग्लोबल मैनेजमेंट प्राइवेट लिमिटेड | R NO C-1 MAYA NAGARB G KHER ROAD WORLI, MUMBAI, Maharashtra
+    S3-480078343 [India] ग्लोबल मैनेजमेंट प्राइवेट लिमिटेड | R No 1 Maya Nagarb G Kher Road Worli, Greater Mumbai, Mumbai, MH
+
+  S1-993624127 [India] Alfatech Craft Private Limited | 407, Silver Radiance, Pakwan Char Rasta, Sindhu Bhavan Road, Bodakdev, Ahmedabad, Gujarat
+    S2-151604403 [India] Alfatech Craft Private Limited Limited | 407, SILVER RADIANCE, PAKWAN CHAR RASTA, SINDHU BHAVAN ROAD, BODAKDEV, AHMEDABAD, Gujarat
+    S2-597826410 [India] ALFATECH CRAFT PRIVATE LIMITED | 407, SILVER RADIANCE, PAKWAN CHAR RASTA, SINDHU BHAVAN ROAD, BODAKDEV, AHMEDABAD, ગુજરાત
+    S3-306064759 [India] Alfatech  Craft Private Limited | 407, Silver Radiance, Pakwan Char Rasta, Sindhu Bhavan Road, Bodakdev, Ahmedabad, GJ
+    S3-524485015 [India] Alfatech Craft | 407, Silver Radiance, Pakwan Char Rasta, Sindhu Bhavan Road, Bodakdev, Ahmedabad, GJ
+    S3-698940323 [India] Dr Alfatech Private Craft Limited | 407, Silver Radiance, Pakwan Char Rasta, Sindhu Bhavan Road, Bodakdev, Ahmedabad, GJ
+
+  S1-749777504 [US] Dingle and Andy | 700 Albert Pike Avenue, Unit Apt 1001, Fort Smith, AR
+    S2-707899680 [US] Dingle and Andy | 0700 ALBERT PIKE AVE, PMB 3948, FORT SMITH, AR
+    S3-847056973 [US] Dingle and Andy (Corp) | 
+
+  S1-555581500 [US] Pediatric Clinic LLC | 419 47, Harrietstown, NY
+    S2-81623698 [US] Pediatric LLC Center | 419 47, HARRIETSTOWN, NY
+    S3-638219348 [US] Pediatric Clinic LLC | 418 47, Harrietstown, New York
+
+  S1-795359676 [India] Belgaum Polytechnic Corp | Gurugaon, House No 162 Ground Floor Sector 28, Gurgaon, Haryana
+    S3-685834714 [India] Shri Belgaum Polytechnic  (Corp) | Door No 604 House No 162 Ground Floor Sector 28, Gurugaon, Gurhaon, HR
+
+  S1-628688391 [US] Danielle Powell Wintergreen L.L.C. | 404 Pinion Hills Drive, Dammeron Valley, UT
+    S3-745750215 [US] #daniellepowell | Dammeron Valley, Utah, 404 Pinion Hills Dr
+
+  S1-319460684 [US] Rev It Up Seafood | 1701 Hairston Avenue, Unit Apt 114, Conway, AR
+    S2-142673473 [US] revitup.com | 1701 HAIRSTON AVE, CONWAY, AR
+    S2-297413216 [US] Rev lt Up Seafood | HAIRSTON AVENUE, CONWAY, AR
+    S2-464701187 [US] Rev It Up Seafood Center | 1701 HAIRSTON AVE, CONWAY, AR
+    S2-688649782 [US] Violyra | 1701 HAIRSTON AVENUE, CONWAY, AR
+    S3-644712780 [US] Rev Up It Seafood | 2060-C Hairston Ave, Unit Apt 114, Conway, Arkansas
+    S3-796078787 [US] Rev It Up Seafood Ltd | 
+
+  S1-118025901 [US] East Family Practice | 6826 Stampede Boulevard, Bremerton, WA
+    S2-789682020 [US] EAST  FAMILY | 6826 STAMPEDE BLVD, BREMERTON, WA
+    S3-173975774 [US] East Family Services | 6826 Stampede Blvd, Bremerton, Washington
+
+  S1-618244734 [US] Udy Interstate Roofing | 5710 73rd Street, Town Of Grand Rapids, WI
+    S3-430626421 [US] Udy Interstate Roofing [Ltd] | 5710 73rd Saint, Wisconsin Rapids, Wisconsin
+    S3-625938046 [US] Udy Interstate | 5710 73rd St, Town Of Grand Rapids, Wisconsin
+
+  S1-704488764 [India] Pioneer Products Private Limited | 51/10G/1 West Arjun Nagar, Agra, Uttar Pradesh
+    S2-107194560 [India] Pioneer Products प्राइवेट लिमिटेड | 51/10G/1 WEST ARJUN NAGAR, AGRA, Uttar Pradesh
+    S2-13668425 [India] पायोनियर प्रोडक्ट्स प्राइवेट लिमिटेड | DOOR NO 51/10G/1 WEST ARJUN NAGAR, AGRA, उत्तर प्रदेश
+    S2-229904809 [India] पायोनियर प्रोडक्ट्स प्राइवेट लिमिटेड | 51/10G/1 WEST ARJUN NAGAR, AGRA, Uttar Pradesh
+    S2-420545880 [India] Pioneer-Products  Private Limited (ID: 63945) | NO 51/10G/1 WEST ARJUN NAGAR, AGRA, Uttar Pradesh
+    S3-188013139 [India] pioneerproducts.com | 51/10G/1 West Arjun Nagar, Agra, UP
+    S3-300356426 [India] पायोनियर प्रोडक्ट्स प्राइवेट लिमिटेड | #51/10G/1 West Arjun Nagar, Agra, UP
+    S3-701222511 [India] पायोनियर प्रोडक्ट्स प्राइवेट लिमिटेड | 51/10G/1 West Arjun Nagar, Agra, उत्तर प्रदेश
+
+  S1-523531644 [US] Hummel Creative Bhav Inc | 827 Dewees Place, Trappe Borough, PA
+    S2-394318093 [US] Hummel Creative Bháv [Inc] | 
+    S2-5011010 [US] Ínc Humme1 Creative Bhav | 827 DEWEES PLACE, COLLEGEVILLE, PA
+    S2-505481271 [US] Hummel Creative Bhav Ínc | DEWEES PLACE, COLLEGEVILLE, PA
+    S2-556000305 [US] Hummel Bhav Inc Center | #827 DEWEES PLACE, COLLEGEVILLE, PA
+    S3-459314423 [US] Hummel Creative | 827 Dewees Place, Collegeville, Pennsylvania
+    S3-678887752 [US] hummelcreativebhav.com | 827 Dewees Place, Collegevville, Pennsylvania
+
+  S1-889609266 [US] P/E Century Inc | 215 Q Street, Quincy, WA
+    S2-327609582 [US] P/E CTURY INC | 
+    S2-733861340 [US] P/E  Century Incorporated | INCORPORATED, WA, 215A Q ST
+    S2-75896895 [US] P/E Inc Century | Q STREET, QUINCY, WA
+    S3-296547120 [US] P/E Century | 215 Q Street, Incorporated, Washington
+    S3-598284879 [US] P/E Century Inc. | 215 Q St, Incorporated, Washington
+
+  S1-611728151 [US] Castellanos, Zaneta, MD, P.C. Group | IN, Chalmers, 1830 Raub Road
+    S2-13294274 [US] Castellan0s, Zaneta, MD, P.C. Group | 
+    S2-236436969 [US] The Castellanos, Zaneta, MD, P.C. Group | Raub Rd, CHALMERS, IN
+    S3-170187148 [US] Castellanos, Zaneta, MD, P.C. [Group] | Chalmers, Indiana, 1830 Raub Rd
+    S3-283203474 [US] castellanoszanetamd.com | 1830 Raub Rd, Chalmers, Indiana
+    S3-669469775 [US] Castellanos, Zaneta, MD, P.C. Inc | Chalmers, 1830 Raub Road, Indiana
+
+Sample singletons:
+  S1-460382137 [US] Novify Infrastructure | Bellevue, OH, 118 Friedley Avenue
+  S1-787972200 [India] Taas Advisors Private Limited | D-1/36 New Kondli, Delhi, East Delhi, Delhi
+  S1-47538361 [India] Star Investment | Coimbatore, 321, Coimbatore-641 012., Divine Complex, 7Th Street, Gandhipuram, Tamil Nadu
+  S1-129079165 [US] Jensen and Bell, LLC | 1911 Webster Avenue, Topeka, KS
+  S1-237016277 [US] Montic Prudential LLC | 1309 Park Road, Unit 202, Washington, DC
+  S1-787621020 [India] Premier Innovative Global Private Limited | 36-94-264 Ambedkar Estate, Near Municipal School, Kancharapalem, Visakhapatnam (Urban), Visakhapatnam, Vishakhapatnam, Andhra Pradesh
