@@ -1,0 +1,13 @@
+dataset/
+splits/
+runs/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+cache/
+models_cache/
+*.parquet
+*.npz
+*.pkl
+output/*.tsv
