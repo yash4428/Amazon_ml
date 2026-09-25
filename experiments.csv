@@ -1,0 +1,2 @@
+timestamp,tag,split,note,macro_f05,singleton_acc,nonsingleton_f05,micro_precision,micro_recall,false_empty,n_s1,n_singletons,n_pred_pairs,n_true_pairs,pair_recall,entities_fully_covered,avg_candidates_per_s1,reduction_ratio,oracle_f05_ceiling,format_issues
+2026-09-25T13:48:38,exp01_rule_baseline,val,"rule: max(combo_sim,0.8*name_c4_sim), o2o, t1/t2 tuned on 300k train S1; blocking combo@20+name_c4@10",0.77295,0.59743,0.78333,0.94218,0.51906,8954,441363,24649,841582,1527619,0.98127,0.94540,26.60737,0.99999,0.99341,0

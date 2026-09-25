@@ -60,6 +60,16 @@ def label_pairs(cand, s1, pool, truth):
     return n_true
 
 
+def group_ids(pairs, s1_ids, pool_ids):
+    """Map s1_id -> list of pool ids (best score first) from a pair frame with i, j, score."""
+    o = pairs.sort_values(["i", "score"], ascending=[True, False], kind="stable")
+    i = o["i"].values
+    ids = pool_ids[o["j"].values]
+    cuts = np.flatnonzero(np.diff(i)) + 1
+    starts = np.concatenate([[0], cuts]) if len(i) else np.empty(0, int)
+    return {s1_ids[i[a]]: list(g) for a, g in zip(starts, np.split(ids, cuts))} if len(i) else {}
+
+
 def main():
     """Parse args, tune on the train part, predict on the test part, write both output files."""
     ap = argparse.ArgumentParser()
@@ -95,12 +105,8 @@ def main():
 
     s1_ids = s1_te["entity_id"].values
     pool_ids = pool_te["entity_id"].values
-    order = cand_te.sort_values(["i", "score"], ascending=[True, False])
-    candidates = order.groupby("i")["j"].apply(lambda js: list(pool_ids[js.values]))
-    candidates = {s1_ids[i]: v for i, v in candidates.items()}
-    pred = pred.sort_values(["i", "score"], ascending=[True, False])
-    matches = pred.groupby("i")["j"].apply(lambda js: list(pool_ids[js.values]))
-    matches = {s1_ids[i]: v for i, v in matches.items()}
+    candidates = group_ids(cand_te, s1_ids, pool_ids)
+    matches = group_ids(pred, s1_ids, pool_ids)
     write_outputs(args.out_dir, list(s1_ids), matches, candidates)
     with open(os.path.join(args.out_dir, "run_info.json"), "w") as f:
         json.dump({"params": params, "train_macro_f05": f_tr, "blocking": config.BLOCKING,

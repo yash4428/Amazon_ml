@@ -48,15 +48,34 @@ def macro_f05_fast(pred, n_true, s1_index):
 def tune_rule(c, n_true, s1_index, score="score", o2o=True, step=0.02, passes=2, verbose=True):
     """Coordinate-descent search of (t1, t2, r) maximising macro F0.5 on labelled candidates.
 
-    ``c`` must have columns i, j, y and ``score``. One-to-one is applied once up front.
+    ``c`` must have columns i, j, y and ``score``. One-to-one is applied once up front;
+    each evaluation is a few numpy bincounts, so hundreds of settings are cheap.
+    ``s1_index`` must be 0..n-1 positions (all S1 rows, singletons included).
     """
     base = one_to_one(c, score) if o2o else c
-    grid = np.round(np.arange(0.02, 0.99, step), 3)
-    r_grid = np.round(np.arange(0.0, 0.96, 0.05), 2)
+    n = len(s1_index)
+    i = base["i"].values
+    s = base[score].values.astype(np.float64)
+    y = base["y"].values.astype(np.float64)
+    best_s = np.full(n, -1.0)
+    np.maximum.at(best_s, i, s)
+    b = best_s[i]
+    is_top = s >= b
+    nt = n_true.reindex(s1_index, fill_value=0).values.astype(np.float64)
 
     def ev(t1, t2, r):
-        return macro_f05_fast(apply_rule(base, t1, t2, r, score, o2o=False), n_true, s1_index)
+        keep = np.where(is_top, s >= t1, (s >= t2) & (s >= r * b) & (b >= t1))
+        npred = np.bincount(i[keep], minlength=n).astype(np.float64)
+        tp = np.bincount(i[keep], weights=y[keep], minlength=n)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            p = tp / np.maximum(npred, 1)
+            rc = tp / np.maximum(nt, 1)
+            f = np.where(tp > 0, 1.25 * p * rc / (0.25 * p + rc), 0.0)
+        f = np.where((nt == 0) & (npred == 0), 1.0, f)
+        return float(f.mean())
 
+    grid = np.round(np.arange(0.02, 0.99, step), 3)
+    r_grid = np.round(np.arange(0.0, 0.96, 0.05), 2)
     t1, t2, r = 0.5, 0.5, 0.0
     best = ev(t1, t2, r)
     for _ in range(passes):
