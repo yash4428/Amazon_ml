@@ -256,6 +256,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 04:15 **3-way blend exp10+exp11+exp12 (equal weights, t1 .70 t2 .72 r 0)** validator+sanity PASS, 11.9 cand/S1
   → **day2_best := day2_blend3**. Alternatives kept: day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide (non-crowd).
 - 04:16 running crowd A/B with COUNTRY folds (unseen-country check for crowd training) → runs/crowd_eval_country.log.
+- 04:29 **crowd A/B with COUNTRY folds** (train one country, validate the other; 120k S1): A normal 0.9622 /
+  A crowded 0.9584; **B normal 0.9605 / B crowded 0.9601 (+0.0017 vs A)** → crowd training also helps on an unseen,
+  crowded country (the France situation), smaller than seen-country gain (+0.0031).
+- 04:31 exp13 launched: crowd 0.5, seed+3, **800k S1** (more data) → to join the blend.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
