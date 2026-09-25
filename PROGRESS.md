@@ -6,20 +6,20 @@ changing anything. Rulebooks: `CLAUDE.md` (hard rules, metric, pipeline spec) an
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 0. TL;DR (updated 26 Sep 00:15 IST)
+## 0. TL;DR (updated 26 Sep 05:20 IST)
 
-- **Best public score so far: 0.964** (day1_5, blend of exp06+exp07). Leader 0.9884, top-15 ≈ 0.984, top-100 ≈ 0.97.
-  We were ~300th at end of Day 1.
-- **Local metric to trust: OOF macro-F0.5 on the FULL `dataset/train`** (written by every lgbm run to
-  `runs/<exp>/report/oof.json`). **Do not use the `val`/`val2` split scores** — they are optimistic (see §4).
-- **Diagnosis of our gap** (§6): (a) France ≈ 0.91 vs US/India ≈ 0.97 on test (measured with a probe submission);
-  (b) test has 40-55% more fake-branch distractors per S1 than train (France ~9 per S1), so a model trained on
-  train density over-accepts on test; (c) blocking recall (~97.6%) caps us — half of all OOF loss.
-- **Overnight (26 Sep) running**: `runs/night_chain.sh`:
-  exp09 = wide blocking (combo_c@60 + combo@30) + **stage-1 filter** (~10 cand/S1 instead of 30, higher recall)
-  → then `dev/crowd_eval.py` (A/B: does training with synthetic fake branches help on test-like data?).
-  Status/timing in `runs/night_chain.log`, `runs/exp09_test.log`, `runs/crowd_eval.log`.
-- **Morning deliverable**: best validated file in `submissions/day2_best/` (see §9 for what was chosen and why).
+- **Best public so far: 0.964** (day1_5). Leader 0.9884, top-15 ≈ 0.984, top-100 ≈ 0.97.
+- **Morning file (validated): `submissions/day2_best/matching_results.tsv`** = 0.7·exp13 + 0.3·blend(exp10,exp11,exp12).
+  All are LightGBM models with **wide blocking + stage-1 filter (11.9 cand/S1, was 29.5)** and **crowd training**
+  (train pool augmented with 50% synthetic fake branches to match test density). exp13 alone: OOF 0.9804
+  (IN .9776 US .9822) under crowded conditions (our previous best, exp06, was 0.9771 under easier normal conditions).
+- **Local metric to trust: OOF macro-F0.5 on the FULL `dataset/train`**; prefer the crowded version (`--crowd 0.5`)
+  and check unseen-country behaviour with `dev/crowd_eval.py --country-folds`. **Never use `val`/`val2`** (§4).
+- Why we were stuck at 0.96: (a) test has 40-55% more fake-branch distractors per S1 than train (France ≫) → models
+  trained at train density over-accept and lose recall in dense regions; (b) narrow blocking capped recall; (c) France
+  weakest (≈0.91 by probe). Overnight fixes target all three (§9).
+- Suggested Day-2 slot plan: (1) day2_best; (2) if it clearly beats 0.964, try day2_exp13 or a threshold variant from
+  saved `test_scores.parquet` only if local evidence supports it; (3) keep 1-2 slots for new ideas (§8).
 
 ---------------------------------------------------------------------------------------------------------------
 
@@ -147,7 +147,11 @@ Caches (gitignored, safe to delete, rebuilt automatically): `cache/norm_s{1,2,3}
 | blend | 0.5·exp06 + 0.5·exp07 | (blend05/06 OOF 0.97726) | – | **0.964** | day1_5 |
 | exp08 | exp06 + `--crowd 0.5` | stopped after caching crowded blocking | – | – | used by crowd_eval |
 | exp09 | wide blocking c60+c30 + stage-1 (~11/S1, recall .9819) | **0.9795** | IN .9763 US .9817 | – | 2.7× fewer candidates |
-| exp10 | exp09 + crowd 0.5 (train-time synthetic branches) | 0.9789 (crowded OOF) | IN .9756 US .9811 | – | expected best on test |
+| exp10 | exp09 + crowd 0.5 (train-time synthetic branches) | 0.9789 (crowded OOF) | IN .9756 US .9811 | – | |
+| exp11 | exp10, seed+1, 400k S1 | 0.9794 (crowded) | IN .9761 US .9816 | – | |
+| exp12 | exp10, seed+2, 400k S1 | 0.9792 (crowded) | IN .9762 US .9812 | – | |
+| exp13 | exp10, seed+3, **800k S1** | **0.9804** (crowded) | IN .9776 US .9822 | – | best single |
+| blends | 10+11: 0.97935 (common 54k S1); 11+12: 0.98016 (72k); 13 alone ≥ 13-blends | | | | day2_best = .7·13 + .3·(10,11,12) |
 
 Blocking tables (30k train-part S1, with learned translit):
 - combo20+c4_10 0.9735 @26.6/S1 · combo_c20+combo10 0.9770 @22.5 · **combo_c25+combo15 0.9813 @30.0** ·
@@ -260,6 +264,12 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   A crowded 0.9584; **B normal 0.9605 / B crowded 0.9601 (+0.0017 vs A)** → crowd training also helps on an unseen,
   crowded country (the France situation), smaller than seen-country gain (+0.0031).
 - 04:31 exp13 launched: crowd 0.5, seed+3, **800k S1** (more data) → to join the blend.
+- 05:01 **exp13 (crowd 0.5, 800k S1, seed+3) OOF 0.9804** (IN .9776 US .9822), logloss 0.0253 (vs ~0.027 at
+  300-400k) → more data helps. Pairwise on common S1: exp13 alone ≥ any 50/50 blend with a 300-400k model
+  (vs exp10 0.98018 vs best blend 0.98011; vs exp11 0.98044 = 0.98044; vs exp12 0.98026 vs 0.98031 at w=0.7).
+- 05:16 **day2_best := 0.7·exp13 + 0.3·blend(10,11,12)**, params t1=.72 t2=.72 r=0 (exp13 OOF), validator+sanity
+  PASS, 11.9 cand/S1, empty 0.056 (France 0.052, 3.39 matches/row). Also packaged: day2_exp13 (exp13 alone).
+- 05:17 exp14 launched (crowd 0.5, 800k S1, seed+4) → blend with exp13 if it helps on common OOF.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
