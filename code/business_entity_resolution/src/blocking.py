@@ -151,7 +151,7 @@ def topk_cosine(S, P, k, chunk=config.BLOCK_CHUNK, n_jobs=1):
     return tuple(np.concatenate([r[i] for r in res]) for i in range(4))
 
 
-def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose=True):
+def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose=True, post=None):
     """Union of top-K candidates from every generator, blocked by country.
 
     Parameters
@@ -187,6 +187,15 @@ def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose
         m = per_gen[0]
         for d in per_gen[1:]:
             m = m.merge(d, on=["i", "j"], how="outer")
+        for g in generators:
+            m[f"{g}_sim"] = m[f"{g}_sim"].fillna(0).astype(np.float32)
+            m[f"{g}_rank"] = m[f"{g}_rank"].fillna(99).astype(np.int16)
+        if post is not None:
+            n0 = len(m)
+            m = post(m)
+            if verbose:
+                print(f"  [{country}] stage-1 filter: {n0} -> {len(m)} pairs "
+                      f"({len(m) / max(len(si), 1):.1f} per S1)", flush=True)
         parts.append(m)
     cand = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["i", "j"])
     for g in generators:

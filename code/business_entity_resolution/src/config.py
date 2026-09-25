@@ -15,9 +15,12 @@ BLOCK_CHUNK = 2000            # S1 rows per sparse-matmul chunk
 # exp05 (with learned translit): combo_c@25 + combo@15 -> recall 0.9813, oracle 0.9938,
 # 30.0 cand/S1 (was combo@20 + name_c4@10: 0.9735 @ 26.6). See PROGRESS.md table.
 BLOCKING = {
-    "combo_c":   dict(space="combo_c",   k=25, max_df=20000),
-    "combo":     dict(space="combo",     k=15, max_df=20000),
+    "combo_c":   dict(space="combo_c",   k=60, max_df=20000),
+    "combo":     dict(space="combo",     k=30, max_df=20000),
 }
+# Stage-1 filter after wide blocking (see stage1.py). 30k-S1 sample: 10.0 cand/S1,
+# recall 0.9842, oracle 0.9952 (narrow blocking was 30 cand/S1, recall 0.9814).
+STAGE1 = dict(min_p=0.001, max_keep=20, rounds=250, train_s1=60_000)
 
 # ---------------------------------------------------------------- tuning
 TUNE_S1 = 300_000             # train S1 sampled for threshold tuning (full train pool kept)

@@ -24,6 +24,7 @@ from features import (add_dup_counts, add_synthetic_branches, chunk_features, cl
                       dup_features, encode_extras, global_context, hmis_features,
                       house_mismatch_token_rates, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
+from stage1 import prune, stage1_features, train_stage1  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
 from normalize import apply_translit_dict, build_translit_dict, load_normalized  # noqa: E402
 
@@ -33,9 +34,10 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def blocking_cached(s1, pool, tag):
-    """Run blocking, caching the candidate frame by (record ids, blocking config)."""
+def blocking_cached(s1, pool, tag, post=None, post_key=""):
+    """Run blocking (+ optional per-country stage-1 filter), cached by (record ids, config)."""
     h = hashlib.md5()
+    h.update(post_key.encode())
     h.update(json.dumps(config.BLOCKING, sort_keys=True).encode())
     h.update(str(config.NORM_VERSION).encode())
     h.update(str(len(s1)).encode() + str(len(pool)).encode())
@@ -45,7 +47,7 @@ def blocking_cached(s1, pool, tag):
     if os.path.exists(path):
         log(f"blocking cache hit {path}")
         return pd.read_parquet(path)
-    cand = generate_candidates(s1, pool)
+    cand = generate_candidates(s1, pool, post=post)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     cand.to_parquet(path, index=False)
     return cand
@@ -84,6 +86,31 @@ def extra_feats(c, s1, pool, neg, pos):
                          "xtok_n": np.array([len(e) for e in ex], np.float32)}, index=c.index), ex
 
 
+def stage1_key():
+    """Cache-key string for the stage-1 configuration ('' when disabled)."""
+    return json.dumps(config.STAGE1, sort_keys=True) if config.STAGE1 else ""
+
+
+def fit_stage1(s1, pool, truth, model_pos):
+    """Train the stage-1 filter on train S1 that are NOT in the matching-model sample.
+
+    Returns (model or None, post-hook for blocking, cache-key string).
+    """
+    if not config.STAGE1:
+        return None, None, ""
+    rng = np.random.RandomState(config.SEED + 99)
+    rest = np.setdiff1d(np.arange(len(s1)), model_pos)
+    idx = np.sort(rng.choice(rest, min(config.STAGE1["train_s1"], len(rest)), replace=False))
+    s1_s = s1.iloc[idx].reset_index(drop=True)
+    log(f"stage-1: blocking {len(s1_s)} held-out train S1 for filter training")
+    c = generate_candidates(s1_s, pool, verbose=False)
+    label_pairs(c, s1_s, pool, truth)
+    F = stage1_features(c, s1_s, pool)
+    model = train_stage1(F, c["y"].values.astype(np.int8))
+    log(f"stage-1 trained on {len(c)} pairs ({len(c) / len(s1_s):.1f}/S1, recall {c['y'].sum() / sum(len(truth.get(x, ())) for x in s1_s['entity_id']):.4f})")
+    return model, (lambda m: prune(m, s1, pool, model)), stage1_key()
+
+
 def fit_lgbm(args, report_dir):
     """Train-part work for the LightGBM mode: blocking on ALL train S1, features on a
     seeded S1 sample, grouped-CV OOF probabilities, decision rule tuned on OOF, and a
@@ -98,14 +125,15 @@ def fit_lgbm(args, report_dir):
         pool_tr = add_synthetic_branches(pool_tr, truth, args.crowd)
         log(f"crowding: train pool augmented to {len(pool_tr)} records (+{args.crowd:.0%} fake branches)")
     s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
-    log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
-    cand = blocking_cached(s1_tr, pool_tr, "train")
-    hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
-    log(f"house-mismatch token rates: {len(hm_rates)} tokens")
-    cand = pd.concat([cand, global_context(cand)], axis=1)
     rng = np.random.RandomState(config.SEED + args.sample_seed)
     n_model = min(args.model_s1, len(s1_tr))
     pos = np.sort(rng.choice(len(s1_tr), n_model, replace=False))
+    st1, post, post_key = fit_stage1(s1_tr, pool_tr, truth, pos)
+    log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
+    cand = blocking_cached(s1_tr, pool_tr, "train", post=post, post_key=post_key)
+    hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
+    log(f"house-mismatch token rates: {len(hm_rates)} tokens")
+    cand = pd.concat([cand, global_context(cand)], axis=1)
     sub = cand[np.isin(cand["i"].values, pos)].copy()
     del cand
     n_true = label_pairs(sub, s1_tr, pool_tr, truth)
@@ -140,7 +168,7 @@ def fit_lgbm(args, report_dir):
         prm = tuple(json.load(open(args.params_from))["params"])
         log(f"no-CV mode: {args.fixed_rounds} rounds, decision params {prm} from {args.params_from}")
         final = train_full(X, y, args.fixed_rounds)
-        return [final], list(X.columns), prm, float("nan"), (tok_neg, tok_pos), tl
+        return [final], list(X.columns), prm, float("nan"), (tok_neg, tok_pos), tl, st1
     oof, models, imp = train_oof(X, y, fold)
     os.makedirs(report_dir, exist_ok=True)
     pd.Series(imp, index=X.columns).sort_values(ascending=False).to_csv(
@@ -173,7 +201,7 @@ def fit_lgbm(args, report_dir):
         rounds = int(np.mean([m.best_iteration for m in models]) * 1.1)
         log(f"training final model on all {len(y)} pairs, {rounds} rounds")
         final = train_full(X, y, rounds)
-    return [final] if final else models, list(X.columns), params, f_oof, (tok_neg, tok_pos), tl
+    return [final] if final else models, list(X.columns), params, f_oof, (tok_neg, tok_pos), tl, st1
 
 
 def predict_lgbm(cand, s1, pool, models, cols, tok):
@@ -226,8 +254,9 @@ def main():
     np.random.seed(config.SEED)
 
     report_dir = os.path.join(args.out_dir, "report")
+    st1 = None
     if args.mode == "lgbm":
-        models, cols, params, f_tr, tok, tl = fit_lgbm(args, report_dir)
+        models, cols, params, f_tr, tok, tl, st1 = fit_lgbm(args, report_dir)
         log(f"OOF tuned params {params}, OOF macroF0.5 {f_tr:.4f}")
         if args.oof_only:
             return
@@ -241,7 +270,11 @@ def main():
         s1_te, pool_te = apply_translit_dict(s1_te, tl), apply_translit_dict(pool_te, tl)
         s1_te, pool_te = add_dup_counts(s1_te, pool_te)
     log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
-    cand_te = blocking_cached(s1_te, pool_te, "test")
+    if args.mode == "lgbm" and st1 is not None:
+        cand_te = blocking_cached(s1_te, pool_te, "test",
+                                  post=lambda m: prune(m, s1_te, pool_te, st1), post_key=stage1_key())
+    else:
+        cand_te = blocking_cached(s1_te, pool_te, "test")
     if args.mode == "lgbm":
         cand_te = predict_lgbm(cand_te, s1_te, pool_te, models, cols, tok)
     else:
