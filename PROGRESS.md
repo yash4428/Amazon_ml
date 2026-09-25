@@ -9,6 +9,11 @@
 - => Test has ~1.4-1.5x more fake branches (France far more). Effects: (1) blocking top-K gets crowded -> true copies dropped (France matches sit near K 3x more); (2) model prior learned at train density -> more FPs.
 - Feature tweaks (exp06/07) gave only +0.001 public: we were optimising under train conditions.
 
+## Overnight (26 Sep ~00:00): exp08 running
+- exp08 = exp06 config + `--crowd 0.5` (50% synthetic fake branches added to TRAIN pool: nudged copies of distractors). Full 5-fold CV -> OOF under test-like density + test file (runs/exp08_test). ETA ~01:40.
+- Blocking crowding sim (30k S1, +60% synthetic branches): combo_c25+combo15 recall 0.9813 -> 0.9793 only; wider K: 40+20 0.9846 (46/S1), 50+25 0.9864 (59/S1), 60+30 0.9877 (71/S1). => crowding is NOT the main blocking problem; model/threshold under density is.
+- Morning TODO: compare exp08 vs exp06 on crowded OOF (need a model-transfer script: exp06-style model trained un-crowded, evaluated on crowded folds).
+
 ## Day 2 plan (supersedes list below)
 1. Wider blocking (~2x K) + cheap stage-1 filter (few rapidfuzz feats) back to ~10 cand/S1 (email). Validate recall under SIMULATED crowding (inject extra branch-like negatives into train candidate lists).
 2. Density-robust training/decision: weight nobody-type negatives ~1.5x; tune thresholds on OOF with branch-type negatives duplicated to test ratio.
