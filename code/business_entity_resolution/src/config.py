@@ -21,3 +21,14 @@ BLOCKING = {
 
 # ---------------------------------------------------------------- tuning
 TUNE_S1 = 300_000             # train S1 sampled for threshold tuning (full train pool kept)
+
+# ---------------------------------------------------------------- model
+MODEL_S1 = 400_000            # train S1 records used to fit the pair model (sampled, seeded)
+INFER_CHUNK_S1 = 250_000      # S1 records per feature/predict chunk at inference
+N_FOLDS = 5
+LGB_ROUNDS = 2000
+LGB_EARLY_STOP = 50
+LGB_PARAMS = dict(objective="binary", learning_rate=0.05, num_leaves=63,
+                  min_data_in_leaf=50, feature_fraction=0.8, bagging_fraction=0.8,
+                  bagging_freq=1, lambda_l2=1.0, verbose=-1, seed=SEED,
+                  num_threads=N_JOBS, deterministic=True, force_row_wise=True)

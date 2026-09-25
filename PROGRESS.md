@@ -1,9 +1,11 @@
 # PROGRESS
 
 ## Now
-- Current step: Step 2 — Stage 0 DONE (25 Sep ~01:00 IST); 🛑 report sent to Yash.
-- Next action: Step 3 — normalize.py (incl. Indic-script transliteration via aligned Unicode blocks, US/IN state canonicalisation, FR street abbreviations), then blocking.py with recall table on `val`. io_utils.py already written.
-- Current best: none yet
+- Current step: Step 4 (rule baseline -> first submission) running; Step 5 code (features.py, model.py, lgbm mode in run_pipeline) written but NOT yet run.
+- Running in background: rule baseline on loco_india -> loco_us -> real test (output/). Logs: runs/*_run.log.
+- Next action: score loco runs; validator + sanity checks on output/; copy to submissions/day1_1/; 🛑 tell Yash. Then run `--mode lgbm` on val.
+- NOTE: run_pipeline default --mode is `rule` right now (so the queued baseline runs stay baseline). Switch default to lgbm after the chain finishes.
+- Current best: exp01_rule_baseline val=0.7730 (oracle 0.9934, pair recall 0.9813), loco pending.
 
 ## Environment
 - Machine: Apple M4 Pro, 12 cores, 24 GB RAM, no NVIDIA GPU (Apple MPS only), ~140 GB free disk.
@@ -38,6 +40,20 @@
 - Many S1 with ≥2 same-source matches: `sibling_support` + lower t2 are HIGH priority.
 - Exact-name rate 22% (low): char-n-gram names (incl. space-stripped for domains), address char-TF-IDF blocking + features are top priority.
 - Splits (built): val 1.77M/441k S1, val2 same sizes, loco_india 1.32M/883k, loco_us 883k/1.32M. val (random, seed 42), val2 (random, seed 7), loco_india (loco:India), loco_us (loco:US).
+
+## Blocking (Step 3) — chosen config
+- Per country; sparse IDF cosine top-K (chunked matmul in processes, per-row argpartition).
+- `combo` space = name_core + addr_norm unigrams & bigrams, max_df 20000, K=20; `name_c4` = char 4-grams of space-free core name, max_df 5000, K=10.
+- Train-part (30k S1, full 8M pool) table @K=20 each: combo 0.9617 recall/oracle 0.9865; name_bi 0.62; name_c4 0.60; addr_tok 0.85; full union 0.9717 (56 cand/S1).
+  Mixes: combo20+c4_5 0.9656 (22.6/S1); **combo20+c4_10 0.9668 / oracle 0.9880 (26.6/S1)**; +addr5 0.9671; +all@10 0.9688 (34/S1).
+- On val (evaluate.py): pair recall 0.9813, oracle 0.9934, 26.6 cand/S1 (val pool has fewer distractors per S1 than train part/test, so train-part 0.967 is the realistic number).
+- Remaining misses: generic names + empty/partial addresses; rough transliterations ("laiph helthakeyar", "pra li").
+- Runtime: val test side blocking ~90 s; normalisation cache (cache/norm_s{1,2,3}.parquet) built once in 2.6 min for all 22M records.
+
+## Experiments
+| tag | change | val | loco_india | loco_us | oracle | notes |
+|---|---|---|---|---|---|---|
+| exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | pending | pending | 0.9934 | singleton acc 0.60, micro P 0.94 / R 0.52 |
 
 ## Submissions (day, slot, tag, local val, public LB score)
 - none

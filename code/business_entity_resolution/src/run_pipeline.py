@@ -20,6 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
+from features import chunk_features, global_context  # noqa: E402
+from model import predict, train_oof  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
 from normalize import load_normalized  # noqa: E402
 
@@ -70,18 +72,90 @@ def group_ids(pairs, s1_ids, pool_ids):
     return {s1_ids[i[a]]: list(g) for a, g in zip(starts, np.split(ids, cuts))} if len(i) else {}
 
 
+def fit_lgbm(args, report_dir):
+    """Train-part work for the LightGBM mode: blocking on ALL train S1, features on a
+    seeded S1 sample, grouped-CV OOF probabilities, decision rule tuned on OOF."""
+    log("loading train")
+    s1_tr, pool_tr = load_normalized(args.train_dir, "train", n_jobs=config.N_JOBS)
+    truth = read_truth(args.train_dir, "train")
+    log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
+    cand = blocking_cached(s1_tr, pool_tr, "train")
+    cand = pd.concat([cand, global_context(cand)], axis=1)
+    rng = np.random.RandomState(config.SEED)
+    n_model = min(args.model_s1, len(s1_tr))
+    pos = np.sort(rng.choice(len(s1_tr), n_model, replace=False))
+    sub = cand[np.isin(cand["i"].values, pos)].copy()
+    del cand
+    n_true = label_pairs(sub, s1_tr, pool_tr, truth)
+    log(f"model pairs {len(sub)} from {n_model} S1, positives {int(sub.y.sum())}, "
+        f"pair recall {sub.y.sum() / max(n_true.iloc[pos].sum(), 1):.4f}")
+    X = chunk_features(sub, s1_tr, pool_tr)
+    y = sub["y"].values.astype(np.int8)
+    log(f"features {X.shape}")
+    oof, models, imp = train_oof(X, y, sub["i"].values)
+    os.makedirs(report_dir, exist_ok=True)
+    pd.Series(imp, index=X.columns).sort_values(ascending=False).to_csv(
+        os.path.join(report_dir, "feature_importance.csv"), header=["gain"])
+    # tune decision on OOF, with S1 re-indexed to 0..n_model-1 (singletons included)
+    local = np.searchsorted(pos, sub["i"].values)
+    c = pd.DataFrame({"i": local, "j": sub["j"].values, "y": sub["y"].values, "score": oof})
+    nt = pd.Series(n_true.values[pos], index=np.arange(n_model))
+    params, f_oof = tune_rule(c, nt, np.arange(n_model))
+    return models, list(X.columns), params, f_oof
+
+
+def predict_lgbm(cand, s1, pool, models, cols):
+    """Score test candidates chunk by chunk (whole S1 groups per chunk)."""
+    cand = pd.concat([cand, global_context(cand)], axis=1)
+    cand = cand.sort_values("i", kind="stable").reset_index(drop=True)
+    score = np.zeros(len(cand), np.float32)
+    bounds = np.searchsorted(cand["i"].values, np.arange(0, len(s1) + config.INFER_CHUNK_S1,
+                                                          config.INFER_CHUNK_S1))
+    for a, b in zip(bounds[:-1], bounds[1:]):
+        if a == b:
+            continue
+        f = chunk_features(cand.iloc[a:b], s1, pool)
+        score[a:b] = predict(models, f[cols])
+        log(f"  scored pairs {b}/{len(cand)}")
+    cand["score"] = score
+    return cand
+
+
 def main():
     """Parse args, tune on the train part, predict on the test part, write both output files."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--train-dir", required=True)
     ap.add_argument("--test-dir", required=True)
     ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--mode", choices=["lgbm", "rule"], default="rule")
+    ap.add_argument("--model-s1", type=int, default=config.MODEL_S1)
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
                     help="number of train S1 records used for tuning (full train pool is kept)")
     args = ap.parse_args()
     np.random.seed(config.SEED)
 
-    # ---------------- tuning on the labelled train part
+    report_dir = os.path.join(args.out_dir, "report")
+    if args.mode == "lgbm":
+        models, cols, params, f_tr = fit_lgbm(args, report_dir)
+        log(f"OOF tuned params {params}, OOF macroF0.5 {f_tr:.4f}")
+    else:
+        params, f_tr = fit_rule(args)
+
+    # ---------------- inference on the test part
+    log("loading test")
+    s1_te, pool_te = load_normalized(args.test_dir, "test", n_jobs=config.N_JOBS)
+    log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
+    cand_te = blocking_cached(s1_te, pool_te, "test")
+    if args.mode == "lgbm":
+        cand_te = predict_lgbm(cand_te, s1_te, pool_te, models, cols)
+    else:
+        cand_te["score"] = baseline_score(cand_te)
+    pred = apply_rule(cand_te, *params)
+    write_run(args, s1_te, pool_te, cand_te, pred, params, f_tr)
+
+
+def fit_rule(args):
+    """Rule-baseline tuning on a sample of train S1 (full train pool)."""
     log("loading train")
     s1_tr, pool_tr = load_normalized(args.train_dir, "train", n_jobs=config.N_JOBS)
     truth = read_truth(args.train_dir, "train")
@@ -93,15 +167,11 @@ def main():
     cand_tr["score"] = baseline_score(cand_tr)
     log(f"train candidates {len(cand_tr)}, pair recall {cand_tr.y.sum() / max(n_true.sum(), 1):.4f}")
     params, f_tr = tune_rule(cand_tr, n_true, np.arange(len(s1_tr)))
-    del s1_tr, pool_tr, cand_tr
+    return params, f_tr
 
-    # ---------------- inference on the test part
-    log("loading test")
-    s1_te, pool_te = load_normalized(args.test_dir, "test", n_jobs=config.N_JOBS)
-    log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
-    cand_te = blocking_cached(s1_te, pool_te, "test")
-    cand_te["score"] = baseline_score(cand_te)
-    pred = apply_rule(cand_te, *params)
+
+def write_run(args, s1_te, pool_te, cand_te, pred, params, f_tr):
+    """Write matching_results.tsv, candidate_pairs.tsv and run_info.json."""
 
     s1_ids = s1_te["entity_id"].values
     pool_ids = pool_te["entity_id"].values
@@ -109,7 +179,7 @@ def main():
     matches = group_ids(pred, s1_ids, pool_ids)
     write_outputs(args.out_dir, list(s1_ids), matches, candidates)
     with open(os.path.join(args.out_dir, "run_info.json"), "w") as f:
-        json.dump({"params": params, "train_macro_f05": f_tr, "blocking": config.BLOCKING,
+        json.dump({"mode": args.mode, "params": params, "train_macro_f05": f_tr, "blocking": config.BLOCKING,
                    "n_s1": len(s1_ids), "n_pred_pairs": int(len(pred)),
                    "n_cand_pairs": int(len(cand_te))}, f, indent=2)
     log(f"wrote {args.out_dir}: {len(pred)} matches, {len(cand_te)} candidates, "

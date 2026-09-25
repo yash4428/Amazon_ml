@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from rapidfuzz import distance, fuzz, process
 
-import config
 
 W = -1  # rapidfuzz workers: all cores
 
@@ -83,44 +82,54 @@ def string_features(a, b):
     return pd.DataFrame(f)
 
 
-def context_features(c, score_col):
-    """Within-S1 and within-candidate competition features from a pair-level score column."""
+def context_features(c, score_col, cand_side=True):
+    """Within-S1 (and optionally within-candidate) competition features from one score column.
+
+    c needs columns i, j and ``score_col``. Candidate-side features compare this S1
+    with every other S1 that retrieved the same pool record, so they must be
+    computed on the full candidate set, never on a subsample of S1.
+    """
     out = {}
     s = c[score_col].values
     g = c.groupby("i")[score_col]
     best = g.transform("max").values
-    out[f"{score_col}_gap"] = best - s
+    out[f"{score_col}_gap"] = (best - s).astype(np.float32)
     out[f"{score_col}_rank_s1"] = g.rank(ascending=False, method="min").values.astype(np.float32)
-    out[f"{score_col}_n_close"] = (c.assign(_c=(best - s) <= 0.05)
-                                   .groupby("i")["_c"].transform("sum").values.astype(np.float32))
-    gj = c.groupby("j")[score_col]
-    bestj = gj.transform("max").values
-    out[f"{score_col}_rank_cand"] = gj.rank(ascending=False, method="min").values.astype(np.float32)
-    out[f"{score_col}_gap_cand"] = bestj - s
-    out[f"{score_col}_n_s1_for_cand"] = gj.transform("size").values.astype(np.float32)
+    close = pd.Series((best - s) <= 0.05, index=c.index)
+    out[f"{score_col}_n_close"] = close.groupby(c["i"]).transform("sum").values.astype(np.float32)
+    if cand_side:
+        gj = c.groupby("j")[score_col]
+        bestj = gj.transform("max").values
+        out[f"{score_col}_rank_cand"] = gj.rank(ascending=False, method="min").values.astype(np.float32)
+        out[f"{score_col}_gap_cand"] = (bestj - s).astype(np.float32)
+        out[f"{score_col}_n_s1_for_cand"] = gj.transform("size").values.astype(np.float32)
     return pd.DataFrame(out, index=c.index)
 
 
-def build_features(cand, s1, pool, chunk=5_000_000):
-    """Full feature frame for a candidate frame (columns i, j + blocking sims/ranks)."""
-    parts = []
-    for lo in range(0, len(cand), chunk):
-        c = cand.iloc[lo:lo + chunk]
-        a = s1.iloc[c["i"].values].reset_index(drop=True)
-        b = pool.iloc[c["j"].values].reset_index(drop=True)
-        f = string_features(a, b)
-        f["src3"] = (b["src"].values == 3).astype(np.float32)
-        parts.append(f)
-    feats = pd.concat(parts, ignore_index=True)
-    feats.index = cand.index
-    for col in cand.columns:
-        if col.endswith("_sim") or col.endswith("_rank"):
-            feats[col] = cand[col].values.astype(np.float32)
-    feats["n_cand_s1"] = cand.groupby("i")["j"].transform("size").values.astype(np.float32)
-    tmp = cand[["i", "j"]].copy()
-    tmp["name_sim"] = feats["name_core_tset"].values
-    tmp["addr_sim"] = feats["addr_tset"].values
-    tmp["combo"] = cand["combo_sim"].values
-    for col in ("name_sim", "addr_sim", "combo"):
-        feats = pd.concat([feats, context_features(tmp, col).set_index(feats.index)], axis=1)
-    return feats
+def global_context(cand):
+    """Blocking-score context features over the FULL candidate set (all S1)."""
+    parts = [context_features(cand, "combo_sim"), context_features(cand, "name_c4_sim")]
+    out = pd.concat(parts, axis=1)
+    out["n_cand_s1"] = cand.groupby("i")["j"].transform("size").values.astype(np.float32)
+    return out.add_prefix("ctx_")
+
+
+def chunk_features(c, s1, pool):
+    """String features + blocking columns + S1-side string contexts for a chunk of pairs.
+
+    ``c`` must contain whole S1 groups (all candidates of each S1 present).
+    """
+    a = s1.iloc[c["i"].values].reset_index(drop=True)
+    b = pool.iloc[c["j"].values].reset_index(drop=True)
+    f = string_features(a, b)
+    f["src3"] = (b["src"].values == 3).astype(np.float32)
+    f.index = c.index
+    for col in c.columns:
+        if col.endswith("_sim") or col.endswith("_rank") or col.startswith("ctx_"):
+            f[col] = c[col].values.astype(np.float32)
+    tmp = pd.DataFrame({"i": c["i"].values, "j": c["j"].values,
+                        "name_sim": f["name_core_tset"].values,
+                        "addr_sim": f["addr_tset"].values}, index=c.index)
+    for col in ("name_sim", "addr_sim"):
+        f = pd.concat([f, context_features(tmp, col, cand_side=False)], axis=1)
+    return f
