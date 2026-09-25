@@ -243,6 +243,11 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   recall after stage-1 0.9811 at 12 cand/S1. exp09 0.9795 was measured under normal conditions; the A/B implies an
   exp09-type model loses ~0.005 under crowding (→ ~0.975), so exp10 is expected ~+0.004 better on test.
 - 03:05 queued exp11 (exp10 config, sample-seed 1, 400k S1) for a blend.
+- 03:11 exp10 test written (11.9 cand/S1, validator+sanity PASS). vs exp09 on test: France +31k/−6k pairs,
+  India +22k/−13k, US +20k/−17k. France dropped pairs are branch-like (house diff 58%, branch_sig 44%); added pairs
+  are same-address (same house 76%) with a swapped generic word (e.g. "Forge Sport SARL" -> "Forge Parents SARL") —
+  in train such swaps are 98% true matches. => France loss was partly RECALL; crowd training recovers it.
+  **day2_best := exp10** (exp09 kept as submissions/day2_exp09_wide).
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------

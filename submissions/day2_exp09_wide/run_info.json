@@ -1,11 +1,11 @@
 {
   "mode": "lgbm",
   "params": [
-    0.72,
     0.7,
+    0.74,
     0.0
   ],
-  "train_macro_f05": 0.978892470295136,
+  "train_macro_f05": 0.9795143765840023,
   "blocking": {
     "combo_c": {
       "space": "combo_c",
@@ -19,6 +19,6 @@
     }
   },
   "n_s1": 1732544,
-  "n_pred_pairs": 5867485,
+  "n_pred_pairs": 5830243,
   "n_cand_pairs": 20612899
 }
