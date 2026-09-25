@@ -31,6 +31,11 @@ ap.add_argument("--model-s1", type=int, default=150000)
 ap.add_argument("--crowd", type=float, default=0.5)
 ap.add_argument("--folds", type=int, default=3)
 a = ap.parse_args()
+# Pin the exp06-era narrow blocking so the cached normal (exp06) and crowded (exp08) candidate
+# frames are reused; the A/B question (crowded training) does not depend on the blocking width.
+config.BLOCKING = {"combo_c": dict(space="combo_c", k=25, max_df=20000),
+                   "combo": dict(space="combo", k=15, max_df=20000)}
+config.STAGE1 = None
 
 d = os.path.join(config.ROOT, "dataset", "train")
 s1_0, pool_0 = load_normalized(d, "train")

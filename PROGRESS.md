@@ -233,6 +233,11 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 01:41 exp09 test written: 20.6M candidate pairs = **11.9 cand/S1** (France 16.7, India 11.6, US 10.4; was 29.5).
   Validator PASS, sanity PASS (empty 0.056; France 0.055 / 3.28 matches per row). **Packaged as submissions/day2_best**.
 - 01:41 crowd_eval started (A/B of crowded training, 120k S1, 3 folds).
+- 02:08 **crowd A/B (dev/crowd_eval.py, 120k S1, 3 folds, exp06-era narrow blocking)**:
+  model A (normal training) — normal val 0.9758, **crowded val 0.9710** (−0.0048: density shift hurts);
+  model B (trained with +50% synthetic fake branches) — normal val 0.9743, **crowded val 0.9741** (+0.0031 vs A).
+  Test is crowded (US +54%, IN +38% branch-like, France ≫) → **use crowd training**. B tunes stricter t1 (0.82 vs 0.76).
+- 02:10 exp10 launched = exp09 + `--crowd 0.5` (test candidates reused from exp09 cache).
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
