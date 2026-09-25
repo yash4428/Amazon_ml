@@ -1,10 +1,17 @@
 # PROGRESS
 
-## Now
-- day1_2 READY (exp04, honest OOF 0.9736) -> Yash to upload submissions/day1_2/matching_results.tsv.
-- Running: exp05 (runs/exp05_test, log runs/exp05_test.log), ETA ~21:25 IST -> day1_3.
-- Plan: day1_4 / day1_5 = cheap variants from saved test_scores.parquet (expected-F decision if it beats OOF thresholds; France-empty diagnostic probe).
-- Day 2 backlog: 2-stage candidate filter (small cand/S1 for final ranking per organiser email), sibling-support stacking, expected-F0.5.
+## Now (25 Sep 22:00 IST)
+- Public LB: day1_1 0.679 (rule), day1_2 0.955 (exp04, OOF 0.9736), day1_4 0.963 (exp05, OOF 0.9769). Leader 0.986; top-100 ~0.97.
+- Running: exp06 (runs/exp06_test) = exp05 + house small-offset/branch-signature feats, minus length feats. Blocking cached. ETA ~22:45 -> day1_5 if OOF >= exp05.
+- day1_3_probe (exp04 with France emptied) ready; F_France ≈ (0.955 − probe)/0.1498 + ~0.05.
+- Local-vs-public gap: exp04 0.019, exp05 0.014 (hmis/France-ready feature helped public more than OOF).
+
+## Unseen-country simulator (dev/country_cv.py, country_params.py) — 25 Sep 21:00
+- Train on one country, predict the other (100-150k S1): all feats 0.9608 vs group-CV 0.9752 (drop 0.0144 ≈ public gap).
+- no_xtok: same (0.9609) -> learned branch words not the culprit. no_dup: worse. no_cand_ctx: worse (0.9570). **no_len: 0.9626 (+0.0018), group unchanged** -> length feats dropped in exp06.
+- Stricter thresholds for the unseen country: ~+0.002 US, 0 India -> not worth a France-specific rule.
+- Extra loss on unseen country = FALSE POSITIVES (has_FP 0.0017->0.0054 IN / 0.0019->0.0088 US; singleton_FP x3-6). Recall unchanged.
+- FP types: fake branches with house number nudged by 1-30 on the same street (+Partners/Co/Ltd Services); name-only empty-address records owned by a same-name S1.
 
 ## KEY FINDING (25 Sep 19:00) — how to evaluate
 - Hard negatives are synthetic *sibling branches* of an S1 ("nobody"-owned pool records): same name + branch word (group, holdings, ventures, east, riverside, downtown, infratech, exports...) and a CHANGED house number (30->34, 8520->8527). 80% of singletons' top candidate is such a record.
@@ -72,11 +79,14 @@
 |---|---|---|---|---|---|---|
 | exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | 0.6943 | 0.6951 | 0.9934 | public 0.679; tune-OOF 0.680 |
 | exp02_lgbm | LightGBM 53 feats, 400k S1, lr .05 | OOF(val-train) 0.9622 | - | - | - | rank_cand dominates gain |
-| exp04 | + learned translit dict + name-dup feats, 250k S1, lr .1, full train | OOF 0.9736 | India 0.9662 | US 0.9785 | - | day1_2 |
+| exp04 | + learned translit dict + name-dup feats, 250k S1, lr .1, full train | OOF 0.9736 | India 0.9662 | US 0.9785 | - | public 0.955 (day1_2) |
+| exp05 | blocking combo_c25+combo15 (train recall .9756), hmis branch-word feat, 300k S1 | OOF 0.9769 | India 0.9716 | US 0.9805 | - | public 0.963 (day1_4) |
 | exp03 smoke | + xtok encoding + house cluster feats, 20k S1, lr .08 leaves 127 | OOF(val-train) 0.9650 | India OOF 0.951 | US OOF 0.974 | - | t1=0.78 t2=0.02 r=0.75 |
 
 ## Submissions (day, slot, tag, local val, public LB score)
 - day1_1 | exp01_rule_baseline | val 0.7730 | **public 0.679**
+- day1_2 | exp04 | OOF 0.9736 | **public 0.955**
+- day1_4 | exp05 | OOF 0.9769 | **public 0.963**
 
 ## Ideas backlog (ranked)
 1. Address char-TF-IDF + rare-token blocking (names alone fail for ~8-24% of pairs).
