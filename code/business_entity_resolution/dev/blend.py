@@ -9,19 +9,24 @@ from decide import apply_rule, tune_rule, macro_f05_fast
 from io_utils import read_source, write_outputs
 ap = argparse.ArgumentParser(); ap.add_argument("a"); ap.add_argument("b"); ap.add_argument("--write")
 ap.add_argument("--w", type=float, default=None)
+ap.add_argument("--params-from", default="", help="use fixed decision params from this oof.json (no OOF eval)")
 a = ap.parse_args()
-oa = pd.read_parquet(f"{a.a}/report/oof_pairs.parquet"); ob = pd.read_parquet(f"{a.b}/report/oof_pairs.parquet")
-m = oa.merge(ob[["s1", "x", "score"]], on=["s1", "x"], how="inner", suffixes=("_a", "_b"))
-print("aligned OOF pairs", len(m), "of", len(oa), len(ob))
-s = pd.read_parquet(f"{a.a}/report/oof_s1.parquet"); nt = pd.Series(s.n_true.values, index=np.arange(len(s)))
-best = (None, -1, None)
-for w in ([a.w] if a.w is not None else [0.0, 0.3, 0.5, 0.7, 1.0]):
-    c = m.assign(score=w * m.score_a + (1 - w) * m.score_b)
-    prm, f = tune_rule(c, nt, np.arange(len(s)), verbose=False)
-    print(f"w_a={w:.1f}  OOF macro {f:.5f}  params {prm}")
-    if f > best[1]:
-        best = (w, f, prm)
-print("best", best)
+if a.params_from:
+    best = (a.w, float("nan"), tuple(json.load(open(a.params_from))["params"]))
+    print("fixed blend", best)
+else:
+  oa = pd.read_parquet(f"{a.a}/report/oof_pairs.parquet"); ob = pd.read_parquet(f"{a.b}/report/oof_pairs.parquet")
+  m = oa.merge(ob[["s1", "x", "score"]], on=["s1", "x"], how="inner", suffixes=("_a", "_b"))
+  print("aligned OOF pairs", len(m), "of", len(oa), len(ob))
+  s = pd.read_parquet(f"{a.a}/report/oof_s1.parquet"); nt = pd.Series(s.n_true.values, index=np.arange(len(s)))
+  best = (None, -1, None)
+  for w in ([a.w] if a.w is not None else [0.0, 0.3, 0.5, 0.7, 1.0]):
+      c = m.assign(score=w * m.score_a + (1 - w) * m.score_b)
+      prm, f = tune_rule(c, nt, np.arange(len(s)), verbose=False)
+      print(f"w_a={w:.1f}  OOF macro {f:.5f}  params {prm}")
+      if f > best[1]:
+          best = (w, f, prm)
+  print("best", best)
 if a.write:
     w, f, prm = best
     ta = pd.read_parquet(f"{a.a}/test_scores.parquet"); tb = pd.read_parquet(f"{a.b}/test_scores.parquet")

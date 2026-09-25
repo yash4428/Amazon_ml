@@ -1,10 +1,18 @@
 # PROGRESS
 
-## Now (25 Sep 22:00 IST)
-- Public LB: day1_1 0.679 (rule), day1_2 0.955 (exp04, OOF 0.9736), day1_4 0.963 (exp05, OOF 0.9769). Leader 0.986; top-100 ~0.97.
-- Running: exp06 (runs/exp06_test) = exp05 + house small-offset/branch-signature feats, minus length feats. Blocking cached. ETA ~22:45 -> day1_5 if OOF >= exp05.
-- day1_3_probe (exp04 with France emptied) ready; F_France ≈ (0.955 − probe)/0.1498 + ~0.05.
-- Local-vs-public gap: exp04 0.019, exp05 0.014 (hmis/France-ready feature helped public more than OOF).
+## Now (25 Sep 22:45 IST)
+- Public: day1_1 0.679 | day1_2 exp04 0.955 | day1_3 France-empty probe 0.831 | day1_4 exp05 0.963. Leader ~0.986; we are ~300th.
+- **France probe => France ≈ 0.88 (exp04), ≈ 0.91 (exp05); US+India ≈ 0.968-0.972 on test.** France is ~70% of our gap.
+- Final slot tonight: exp07 (exp06 feats, 600k S1, no CV, 750 rounds, params from exp06) blended 50/50 with exp06
+  -> runs/blend_final. Fallback: submissions/day1_5_exp06 (validator+sanity PASS).
+- exp06 OOF 0.9771 (blend exp05+06 OOF 0.97726). exp06 changes France predictions 2.3x more than US/India (branch_sig targets France FPs).
+
+## Day 2 priorities (from tonight's evidence)
+1. FRANCE. Blocking: France accepted matches sit deep in candidate ranks 3x more than US (rank 18-24: 1.26% vs 0.40%; found only by `combo`: 2.06% vs 0.65%) -> true copies are cut by K. Raise K (esp. dense countries) / make max_df relative to pool size, then a stage-1 filter to keep cand/S1 small (organiser email).
+2. Unseen-country robustness: use country-held-out OOF (dev/country_cv.py) as the selection metric alongside group OOF.
+3. Candidate/sibling clustering (transitivity) for recall in dense areas.
+4. Ask organisers/Yash before any pseudo-labelling on test (rule 7 grey area).
+- Rejected tonight: word-substitution ("swap") hypothesis for France FPs (swap share same across countries; 98% positive in train).
 
 ## Unseen-country simulator (dev/country_cv.py, country_params.py) — 25 Sep 21:00
 - Train on one country, predict the other (100-150k S1): all feats 0.9608 vs group-CV 0.9752 (drop 0.0144 ≈ public gap).
