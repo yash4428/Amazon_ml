@@ -44,6 +44,8 @@ if a.write:
     ta = pd.read_parquet(f"{a.a}/test_scores.parquet"); tb = pd.read_parquet(f"{a.b}/test_scores.parquet")
     t = ta.merge(tb[["s1", "x", "score"]], on=["s1", "x"], how="inner", suffixes=("_a", "_b"))
     t["score"] = w * t.score_a + (1 - w) * t.score_b
+    os.makedirs(a.write, exist_ok=True)
+    t[["s1", "x", "i", "j", "score"]].to_parquet(f"{a.write}/test_scores.parquet", index=False)
     pred = apply_rule(t, *prm)
     s1 = read_source("dataset/test", "test", 1)
     cand = t.sort_values(["i", "score"], ascending=[True, False]).groupby("s1")["x"].apply(list).to_dict()

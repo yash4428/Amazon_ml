@@ -252,6 +252,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 03:42 blend 0.5·exp10 + 0.5·exp11 on the 54k common OOF S1: 0.97935 (exp10 0.97887, exp11 0.97907).
   Validator+sanity PASS. **day2_best := blend_10_11** (t1 .70 t2 .72 r 0; 11.9 cand/S1).
 - 03:44 exp12 launched (seed+2, 400k S1, crowd 0.5) for a 3-way blend.
+- 04:00 exp12 (seed+2, 400k S1) crowded OOF 0.9792. Pairwise common-OOF blend 11+12: 0.98016 (singles 0.97984/0.97978).
+- 04:15 **3-way blend exp10+exp11+exp12 (equal weights, t1 .70 t2 .72 r 0)** validator+sanity PASS, 11.9 cand/S1
+  → **day2_best := day2_blend3**. Alternatives kept: day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide (non-crowd).
+- 04:16 running crowd A/B with COUNTRY folds (unseen-country check for crowd training) → runs/crowd_eval_country.log.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------

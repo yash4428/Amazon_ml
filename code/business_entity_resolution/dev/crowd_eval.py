@@ -30,6 +30,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--model-s1", type=int, default=150000)
 ap.add_argument("--crowd", type=float, default=0.5)
 ap.add_argument("--folds", type=int, default=3)
+ap.add_argument("--country-folds", action="store_true", help="fold = country (unseen-country A/B)")
 a = ap.parse_args()
 # Pin the exp06-era narrow blocking so the cached normal (exp06) and crowded (exp08) candidate
 # frames are reused; the A/B question (crowded training) does not depend on the blocking width.
@@ -46,6 +47,9 @@ rng = np.random.RandomState(config.SEED)
 pos = np.sort(rng.choice(len(s1_0), a.model_s1, replace=False))
 fold_of = np.full(len(s1_0), -1, np.int8)
 fold_of[pos] = np.random.RandomState(1).randint(0, a.folds, len(pos))
+if a.country_folds:
+    fold_of[pos] = pd.factorize(s1_0["country"].values[pos], sort=True)[0]
+    a.folds = int(fold_of[pos].max()) + 1
 nt = pd.Series([len(truth.get(s, ())) for s in s1_0["entity_id"].values[pos]], index=np.arange(len(pos)))
 
 
