@@ -1,10 +1,10 @@
 # PROGRESS
 
 ## Now
-- Day-1 public LB: day1_1 rule baseline = **0.679** (local val said 0.773 -> val split is OPTIMISTIC, see Key finding).
-- Running: exp03 full run dataset/train -> dataset/test (runs/exp03_test, log runs/exp03_test.log). Its OOF (full train, all distractors) is the honest estimate. -> submission day1_2.
-- Next: validate + sanity exp03 output, copy to submissions/day1_2; then `--cv country --oof-only` on dataset/train for the unseen-country check.
-- Leaderboard context (25 Sep evening): top 0.9869, top-15 > 0.984, top-100 > 0.97.
+- day1_2 READY (exp04, honest OOF 0.9736) -> Yash to upload submissions/day1_2/matching_results.tsv.
+- Running: exp05 (runs/exp05_test, log runs/exp05_test.log), ETA ~21:25 IST -> day1_3.
+- Plan: day1_4 / day1_5 = cheap variants from saved test_scores.parquet (expected-F decision if it beats OOF thresholds; France-empty diagnostic probe).
+- Day 2 backlog: 2-stage candidate filter (small cand/S1 for final ranking per organiser email), sibling-support stacking, expected-F0.5.
 
 ## KEY FINDING (25 Sep 19:00) — how to evaluate
 - Hard negatives are synthetic *sibling branches* of an S1 ("nobody"-owned pool records): same name + branch word (group, holdings, ventures, east, riverside, downtown, infratech, exports...) and a CHANGED house number (30->34, 8520->8527). 80% of singletons' top candidate is such a record.
@@ -55,11 +55,24 @@
 - Remaining misses: generic names + empty/partial addresses; rough transliterations ("laiph helthakeyar", "pra li").
 - Runtime: val test side blocking ~90 s; normalisation cache (cache/norm_s{1,2,3}.parquet) built once in 2.6 min for all 22M records.
 
+## Organiser email (25 Sep evening)
+- candidate_pairs.tsv is part of the final submission; SMALLER candidate sets per S1 are ranked higher (beyond LB). Blocking must scale.
+
+## Analysis 25 Sep 19:30-20:10
+- No leakage in file order / id numbers (corr 0.000).
+- Test has ~24% more pool per S1 than train in every country (5.5-5.8 vs 4.7).
+- France: 16 candidates with combo>=0.5 per S1 (US/India ~5) -> dense look-alikes; same generator: branch words in French (Distribution, Developpement, Participations, Groupe, Associes) + changed house numbers.
+- exp04 OOF loss 0.026: recall-only 0.0153 (54% blocking-caused), nonsingle-empty 0.0061, has-FP 0.0033, singleton-FP 0.0016. Pair precision ~0.995.
+- Blocking with translit (30k S1): combo20+c4_10 0.9735@26.6; combo_c20+combo10 0.9770@22.5; **combo_c25+combo15 0.9813@30.0**; combo_c30+combo20+c4_10 0.9846@42; big union 0.9887@77.
+- Stage-1 filter on blocking-only features is weak (top-10: recall 0.959); needs cheap string features.
+- Unsupervised branch-word detector (house-mismatch rate per extra token): holdings .97 riverside .96 group .94 east .88 vs center .38 services .42.
+
 ## Experiments
 | tag | change | val | loco_india | loco_us | oracle | notes |
 |---|---|---|---|---|---|---|
 | exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | 0.6943 | 0.6951 | 0.9934 | public 0.679; tune-OOF 0.680 |
 | exp02_lgbm | LightGBM 53 feats, 400k S1, lr .05 | OOF(val-train) 0.9622 | - | - | - | rank_cand dominates gain |
+| exp04 | + learned translit dict + name-dup feats, 250k S1, lr .1, full train | OOF 0.9736 | India 0.9662 | US 0.9785 | - | day1_2 |
 | exp03 smoke | + xtok encoding + house cluster feats, 20k S1, lr .08 leaves 127 | OOF(val-train) 0.9650 | India OOF 0.951 | US OOF 0.974 | - | t1=0.78 t2=0.02 r=0.75 |
 
 ## Submissions (day, slot, tag, local val, public LB score)
