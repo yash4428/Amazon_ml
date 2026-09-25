@@ -100,7 +100,7 @@ def fit_lgbm(args, report_dir):
     hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
     log(f"house-mismatch token rates: {len(hm_rates)} tokens")
     cand = pd.concat([cand, global_context(cand)], axis=1)
-    rng = np.random.RandomState(config.SEED)
+    rng = np.random.RandomState(config.SEED + args.sample_seed)
     n_model = min(args.model_s1, len(s1_tr))
     pos = np.sort(rng.choice(len(s1_tr), n_model, replace=False))
     sub = cand[np.isin(cand["i"].values, pos)].copy()
@@ -132,6 +132,12 @@ def fit_lgbm(args, report_dir):
         tok_neg = tok_pos = None
     X = X.drop(columns=[c for c in config.DROP_FEATURES if c in X.columns])
     log(f"features {X.shape}, cv={args.cv} folds={len(np.unique(fold))}")
+    if args.fixed_rounds:
+        # No CV: one model on all sampled pairs, decision params taken from a validated run.
+        prm = tuple(json.load(open(args.params_from))["params"])
+        log(f"no-CV mode: {args.fixed_rounds} rounds, decision params {prm} from {args.params_from}")
+        final = train_full(X, y, args.fixed_rounds)
+        return [final], list(X.columns), prm, float("nan"), (tok_neg, tok_pos), tl
     oof, models, imp = train_oof(X, y, fold)
     os.makedirs(report_dir, exist_ok=True)
     pd.Series(imp, index=X.columns).sort_values(ascending=False).to_csv(
@@ -203,6 +209,10 @@ def main():
     ap.add_argument("--model-s1", type=int, default=config.MODEL_S1)
     ap.add_argument("--cv", choices=["group", "country"], default="group",
                     help="country = leave-one-country-out folds (unseen-country simulation)")
+    ap.add_argument("--fixed-rounds", type=int, default=0,
+                    help="skip CV; train one model with this many rounds (needs --params-from)")
+    ap.add_argument("--params-from", default="", help="oof.json of a validated run (decision params)")
+    ap.add_argument("--sample-seed", type=int, default=0, help="offset for the train-S1 sample seed")
     ap.add_argument("--oof-only", action="store_true",
                     help="stop after OOF scoring on the train dir (no test inference)")
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
