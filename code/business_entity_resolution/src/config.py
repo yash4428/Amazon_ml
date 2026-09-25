@@ -26,6 +26,7 @@ TUNE_S1 = 300_000             # train S1 sampled for threshold tuning (full trai
 MODEL_S1 = 300_000            # train S1 records used to fit the pair model (sampled, seeded)
 USE_XTOK = True               # learned extra-name-token encoding feature
 USE_TRANSLIT_DICT = True      # learned Indic-transliteration -> English token map (train pairs)
+DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio"]  # country-specific (unseen-country sim +0.0018)
 NORM_VERSION = 2              # bump when normalisation changes (invalidates blocking cache)
 INFER_CHUNK_S1 = 250_000      # S1 records per feature/predict chunk at inference
 N_FOLDS = 5

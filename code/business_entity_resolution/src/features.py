@@ -10,6 +10,7 @@ from rapidfuzz import distance, fuzz, process
 
 
 W = -1  # rapidfuzz workers: all cores
+config_small_offset = 30  # |house number difference| counted as a "nudged" branch number
 
 
 def _pair(scorer, a, b, dtype=np.float32):
@@ -213,6 +214,15 @@ def cluster_features(c, s1, pool):
     # S1 first number appears anywhere among candidate numbers
     out["house_s1_in_cand"] = np.array([(a != "" and a in b.split()) for a, b in zip(f1, h2)],
                                        np.float32)
+    # Branch signature: same street, house number nudged by a small offset (24082 -> 24090).
+    small = ~np.isnan(diff) & (diff > 0) & (diff <= config_small_offset)
+    out["house_small_offset"] = np.where(np.isnan(diff), -1, small).astype(np.float32)
+    a1 = s1["addr_norm"].values[c["i"].values]
+    a2 = pool["addr_norm"].values[c["j"].values]
+    nonum = lambda t: " ".join(w for w in t.split() if not any(ch.isdigit() for ch in w))
+    x, yy = [nonum(t) for t in a1], [nonum(t) for t in a2]
+    out["addr_nonum_tset"] = _pair(fuzz.token_set_ratio, x, yy)
+    out["branch_sig"] = (small & (out["addr_nonum_tset"] >= 90)).astype(np.float32)
     tmp = pd.DataFrame({"i": c["i"].values, "h2": f2, "eq": (f1 == f2) & (f1 != "")})
     grp = tmp.groupby(["i", "h2"])["i"].transform("size").values
     out["house_cluster_size"] = np.where(f2 == "", 0, grp - 1).astype(np.float32)

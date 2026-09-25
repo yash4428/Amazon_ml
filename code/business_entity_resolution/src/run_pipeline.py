@@ -130,6 +130,7 @@ def fit_lgbm(args, report_dir):
         tok_neg, tok_pos = token_counts(ex, y)
     else:
         tok_neg = tok_pos = None
+    X = X.drop(columns=[c for c in config.DROP_FEATURES if c in X.columns])
     log(f"features {X.shape}, cv={args.cv} folds={len(np.unique(fold))}")
     oof, models, imp = train_oof(X, y, fold)
     os.makedirs(report_dir, exist_ok=True)
