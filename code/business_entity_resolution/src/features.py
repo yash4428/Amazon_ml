@@ -287,3 +287,26 @@ def hmis_features(extras, rates, base=0.25):
         mx[k] = max(v) if v else base
         mean[k] = sum(v) / len(v) if v else base
     return mx, mean
+
+
+def add_synthetic_branches(pool, truth, frac, seed=7):
+    """Training-time augmentation: add nudged copies of distractor records (TRAIN pool only).
+
+    Test has ~1.4-1.5x more fake-branch distractors per S1 than train. We copy a
+    random ``frac`` of train records that belong to no S1 and shift their first
+    house number by 1-20, mimicking the generator's fake branches, so the model
+    and thresholds are fit under test-like density. The copies are never matches.
+    """
+    import re
+    owned = {x for t in truth.values() for x in t}
+    nob = pool[~pool["entity_id"].isin(owned)].sample(frac=frac, random_state=seed).copy()
+    rs = np.random.RandomState(seed)
+    offs = rs.randint(1, 21, len(nob))
+
+    def nudge(t, off):
+        return re.sub(r"\d+", lambda m: str(int(m.group()) + off), t, count=1)
+    nob["addr_norm"] = [nudge(x, o) for x, o in zip(nob["addr_norm"].values, offs)]
+    nob["house_numbers"] = [nudge(x, o) for x, o in zip(nob["house_numbers"].values, offs)]
+    nob["business_address"] = [nudge(x, o) for x, o in zip(nob["business_address"].values, offs)]
+    nob["entity_id"] = [f"SYN-{k}" for k in range(len(nob))]
+    return pd.concat([pool, nob], ignore_index=True)

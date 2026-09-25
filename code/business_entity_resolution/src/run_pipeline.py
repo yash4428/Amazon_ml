@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
-from features import (add_dup_counts, chunk_features, cluster_features,  # noqa: E402
+from features import (add_dup_counts, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
                       dup_features, encode_extras, global_context, hmis_features,
                       house_mismatch_token_rates, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
@@ -94,6 +94,9 @@ def fit_lgbm(args, report_dir):
     tl = build_translit_dict(s1_tr, pool_tr, truth) if config.USE_TRANSLIT_DICT else {}
     log(f"learned transliteration dict: {len(tl)} tokens")
     s1_tr, pool_tr = apply_translit_dict(s1_tr, tl), apply_translit_dict(pool_tr, tl)
+    if args.crowd > 0:
+        pool_tr = add_synthetic_branches(pool_tr, truth, args.crowd)
+        log(f"crowding: train pool augmented to {len(pool_tr)} records (+{args.crowd:.0%} fake branches)")
     s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
     log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
     cand = blocking_cached(s1_tr, pool_tr, "train")
@@ -213,6 +216,8 @@ def main():
                     help="skip CV; train one model with this many rounds (needs --params-from)")
     ap.add_argument("--params-from", default="", help="oof.json of a validated run (decision params)")
     ap.add_argument("--sample-seed", type=int, default=0, help="offset for the train-S1 sample seed")
+    ap.add_argument("--crowd", type=float, default=0.0,
+                    help="train-time augmentation: add this fraction of synthetic fake branches to the train pool")
     ap.add_argument("--oof-only", action="store_true",
                     help="stop after OOF scoring on the train dir (no test inference)")
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,

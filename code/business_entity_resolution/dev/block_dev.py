@@ -15,7 +15,8 @@ from blocking import generate_candidates
 ap = argparse.ArgumentParser()
 ap.add_argument("--split", default="val"); ap.add_argument("--n", type=int, default=30000)
 ap.add_argument("--k", default="5,10,20,50"); ap.add_argument("--gens", default="")
-ap.add_argument("--maxdf", default=""); ap.add_argument("--mix", default=""); ap.add_argument("--country", default="")
+ap.add_argument("--maxdf", default=""); ap.add_argument("--mix", default="")
+ap.add_argument("--crowd", type=float, default=0.0, help="add this fraction of synthetic fake branches (nudged copies of distractors)"); ap.add_argument("--country", default="")
 a = ap.parse_args()
 d = os.path.join(config.ROOT, "splits", a.split, "train")
 s1, pool = load_normalized(d, "train", n_jobs=config.N_JOBS)
@@ -24,6 +25,19 @@ from normalize import build_translit_dict, apply_translit_dict
 if os.environ.get("TL", "1") == "1":
     tl = build_translit_dict(s1, pool, truth); s1, pool = apply_translit_dict(s1, tl), apply_translit_dict(pool, tl)
     print("translit dict", len(tl))
+if a.crowd > 0:
+    import re
+    owned = {x for t in truth.values() for x in t}
+    nob = pool[~pool.entity_id.isin(owned)].sample(frac=a.crowd, random_state=7).copy()
+    rs = np.random.RandomState(7)
+    def nudge(addr, off):
+        return re.sub(r"\d+", lambda m: str(int(m.group()) + off), addr, count=1)
+    offs = rs.randint(1, 21, len(nob))
+    nob["addr_norm"] = [nudge(x, o) for x, o in zip(nob.addr_norm, offs)]
+    nob["house_numbers"] = [nudge(x, o) for x, o in zip(nob.house_numbers, offs)]
+    nob["entity_id"] = [f"S9-{k}" for k in range(len(nob))]
+    pool = pd.concat([pool, nob], ignore_index=True)
+    print(f"crowding: added {len(nob)} synthetic fake branches -> pool {len(pool)}")
 if a.country:
     s1 = s1[s1.country == a.country]
 s1 = s1.sample(min(a.n, len(s1)), random_state=config.SEED).reset_index(drop=True)
