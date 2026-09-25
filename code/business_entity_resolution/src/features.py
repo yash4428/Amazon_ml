@@ -133,3 +133,87 @@ def chunk_features(c, s1, pool):
     for col in ("name_sim", "addr_sim"):
         f = pd.concat([f, context_features(tmp, col, cand_side=False)], axis=1)
     return f
+
+
+# --------------------------------------------------------------------------
+# Name "extra token" encoding and house-number cluster features.
+#
+# Hard negatives in this data are sibling branches of the S1 business: the same
+# name plus an extra word (east, holdings, riverside, ...) and a changed house
+# number. True copies get a different kind of extra word (center, inc, services)
+# or none. We learn, from labelled TRAIN pairs only, how often each extra token
+# appears on negative vs positive pairs (out-of-fold for the training rows).
+# Tokens never seen in training (e.g. French branch words) get a neutral 0.
+# --------------------------------------------------------------------------
+def extra_tokens(n1, n2):
+    """Tokens of candidate name (n2) not in the S1 name (n1), and S1 tokens missing from n2."""
+    t1, t2 = set(n1.split()), set(n2.split())
+    return t2 - t1, t1 - t2
+
+
+def token_counts(extras, y):
+    """Count, per token, how many negative / positive pairs carry it as an extra token."""
+    neg, pos = {}, {}
+    for ex, lab in zip(extras, y):
+        d = pos if lab else neg
+        for w in ex:
+            d[w] = d.get(w, 0) + 1
+    return neg, pos
+
+
+def encode_extras(extras, neg, pos, prior=2.0, min_count=5):
+    """Per pair: max / sum smoothed log-odds(negative) over extra tokens, and #unknown tokens."""
+    mx = np.zeros(len(extras), np.float32)
+    sm = np.zeros(len(extras), np.float32)
+    unk = np.zeros(len(extras), np.float32)
+    for k, ex in enumerate(extras):
+        best, tot = 0.0, 0.0
+        for w in ex:
+            n, p = neg.get(w, 0), pos.get(w, 0)
+            if n + p < min_count:
+                unk[k] += 1
+                continue
+            v = np.log((n + prior) / (p + prior))
+            tot += v
+            if v > best:
+                best = v
+        mx[k], sm[k] = best, tot
+    return mx, sm, unk
+
+
+def pair_extras(c, s1, pool):
+    """List of extra-token sets (candidate vs S1 core names) for every pair in ``c``."""
+    n1 = s1["name_core"].values[c["i"].values]
+    n2 = pool["name_core"].values[c["j"].values]
+    return [set(b.split()) - set(a.split()) for a, b in zip(n1, n2)]
+
+
+def cluster_features(c, s1, pool):
+    """House-number agreement features, including agreement with the S1's other candidates.
+
+    A distractor branch usually comes as several noisy copies that share a house
+    number different from the S1's; true copies mostly share the S1's number.
+    """
+    h1 = s1["house_numbers"].values[c["i"].values]
+    h2 = pool["house_numbers"].values[c["j"].values]
+    f1 = np.array([x.split(" ", 1)[0] for x in h1])
+    f2 = np.array([x.split(" ", 1)[0] for x in h2])
+
+    def num(x):
+        d = "".join(ch for ch in x if ch.isdigit())[:9]
+        return float(d) if d else np.nan
+    v1 = np.array([num(x) for x in f1])
+    v2 = np.array([num(x) for x in f2])
+    out = {}
+    diff = np.abs(v1 - v2)
+    out["house_absdiff_log"] = np.where(np.isnan(diff), -1, np.log1p(diff)).astype(np.float32)
+    out["house_reldiff"] = np.where(np.isnan(diff), -1,
+                                    diff / np.maximum(np.maximum(v1, v2), 1)).astype(np.float32)
+    # S1 first number appears anywhere among candidate numbers
+    out["house_s1_in_cand"] = np.array([(a != "" and a in b.split()) for a, b in zip(f1, h2)],
+                                       np.float32)
+    tmp = pd.DataFrame({"i": c["i"].values, "h2": f2, "eq": (f1 == f2) & (f1 != "")})
+    grp = tmp.groupby(["i", "h2"])["i"].transform("size").values
+    out["house_cluster_size"] = np.where(f2 == "", 0, grp - 1).astype(np.float32)
+    out["n_cand_house_eq_s1"] = tmp.groupby("i")["eq"].transform("sum").values.astype(np.float32)
+    return pd.DataFrame(out, index=c.index)

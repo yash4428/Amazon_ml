@@ -1,11 +1,10 @@
 # PROGRESS
 
 ## Now
-- Current step: Step 4 (rule baseline -> first submission) running; Step 5 code (features.py, model.py, lgbm mode in run_pipeline) written but NOT yet run.
-- Running in background: rule baseline on loco_india -> loco_us -> real test (output/). Logs: runs/*_run.log.
-- Next action: score loco runs; validator + sanity checks on output/; copy to submissions/day1_1/; 🛑 tell Yash. Then run `--mode lgbm` on val.
-- NOTE: run_pipeline default --mode is `rule` right now (so the queued baseline runs stay baseline). Switch default to lgbm after the chain finishes.
-- Current best: exp01_rule_baseline val=0.7730 (oracle 0.9934, pair recall 0.9813), loco pending.
+- Current step: Step 5 — LightGBM. EXP02 (lgbm on val, 400k train S1 for the model, blocking on full train part) running -> runs/val_lgbm, log runs/val_lgbm_run.log.
+- Day-1 submission READY: submissions/day1_1 (rule baseline, validator+sanity PASS). 🛑 Yash to upload `output/matching_results.tsv` and report the public score (log in submissions/log.md).
+- Next action: score EXP02 on val; if good run loco_india/loco_us with lgbm; then error analysis.
+- Current best: exp01_rule_baseline val=0.7730 locoIN=0.6943 locoUS=0.6951 (tag sub-day1-1). Smoke test: lgbm OOF 0.937 on 5k S1.
 
 ## Environment
 - Machine: Apple M4 Pro, 12 cores, 24 GB RAM, no NVIDIA GPU (Apple MPS only), ~140 GB free disk.
@@ -53,10 +52,10 @@
 ## Experiments
 | tag | change | val | loco_india | loco_us | oracle | notes |
 |---|---|---|---|---|---|---|
-| exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | pending | pending | 0.9934 | singleton acc 0.60, micro P 0.94 / R 0.52 |
+| exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | 0.6943 | 0.6951 | 0.9934 | singleton acc 0.60, micro P 0.94 / R 0.52 |
 
 ## Submissions (day, slot, tag, local val, public LB score)
-- none
+- day1_1 | exp01_rule_baseline | val 0.7730 | public: pending
 
 ## Ideas backlog (ranked)
 1. Address char-TF-IDF + rare-token blocking (names alone fail for ~8-24% of pairs).

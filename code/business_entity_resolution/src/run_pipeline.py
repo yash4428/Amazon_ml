@@ -20,8 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
-from features import chunk_features, global_context  # noqa: E402
-from model import predict, train_oof  # noqa: E402
+from features import (chunk_features, cluster_features, encode_extras,  # noqa: E402
+                      global_context, pair_extras, token_counts)
+from model import group_folds, predict, train_full, train_oof  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
 from normalize import load_normalized  # noqa: E402
 
@@ -72,9 +73,18 @@ def group_ids(pairs, s1_ids, pool_ids):
     return {s1_ids[i[a]]: list(g) for a, g in zip(starts, np.split(ids, cuts))} if len(i) else {}
 
 
+def extra_feats(c, s1, pool, neg, pos):
+    """Extra-token encoding features for pairs ``c`` given token counts."""
+    ex = pair_extras(c, s1, pool)
+    mx, sm, unk = encode_extras(ex, neg, pos)
+    return pd.DataFrame({"xtok_max": mx, "xtok_sum": sm, "xtok_unknown": unk,
+                         "xtok_n": np.array([len(e) for e in ex], np.float32)}, index=c.index), ex
+
+
 def fit_lgbm(args, report_dir):
     """Train-part work for the LightGBM mode: blocking on ALL train S1, features on a
-    seeded S1 sample, grouped-CV OOF probabilities, decision rule tuned on OOF."""
+    seeded S1 sample, grouped-CV OOF probabilities, decision rule tuned on OOF, and a
+    final single model on all sampled pairs for inference."""
     log("loading train")
     s1_tr, pool_tr = load_normalized(args.train_dir, "train", n_jobs=config.N_JOBS)
     truth = read_truth(args.train_dir, "train")
@@ -89,10 +99,29 @@ def fit_lgbm(args, report_dir):
     n_true = label_pairs(sub, s1_tr, pool_tr, truth)
     log(f"model pairs {len(sub)} from {n_model} S1, positives {int(sub.y.sum())}, "
         f"pair recall {sub.y.sum() / max(n_true.iloc[pos].sum(), 1):.4f}")
-    X = chunk_features(sub, s1_tr, pool_tr)
     y = sub["y"].values.astype(np.int8)
-    log(f"features {X.shape}")
-    oof, models, imp = train_oof(X, y, sub["i"].values)
+    if args.cv == "country":
+        cn = s1_tr["country"].values[sub["i"].values]
+        fold = pd.factorize(cn, sort=True)[0].astype(np.int8)
+    else:
+        fold = group_folds(sub["i"].values)
+    X = chunk_features(sub, s1_tr, pool_tr)
+    X = pd.concat([X, cluster_features(sub, s1_tr, pool_tr)], axis=1)
+    if config.USE_XTOK:
+        ex = pair_extras(sub, s1_tr, pool_tr)
+        xf = np.zeros((len(sub), 3), np.float32)
+        for k in np.unique(fold):
+            m = fold == k
+            neg, pos_ = token_counts([e for e, t in zip(ex, ~m) if t], y[~m])
+            mx, sm, unk = encode_extras([e for e, t in zip(ex, m) if t], neg, pos_)
+            xf[m] = np.stack([mx, sm, unk], 1)
+        X["xtok_max"], X["xtok_sum"], X["xtok_unknown"] = xf[:, 0], xf[:, 1], xf[:, 2]
+        X["xtok_n"] = np.array([len(e) for e in ex], np.float32)
+        tok_neg, tok_pos = token_counts(ex, y)
+    else:
+        tok_neg = tok_pos = None
+    log(f"features {X.shape}, cv={args.cv} folds={len(np.unique(fold))}")
+    oof, models, imp = train_oof(X, y, fold)
     os.makedirs(report_dir, exist_ok=True)
     pd.Series(imp, index=X.columns).sort_values(ascending=False).to_csv(
         os.path.join(report_dir, "feature_importance.csv"), header=["gain"])
@@ -101,10 +130,28 @@ def fit_lgbm(args, report_dir):
     c = pd.DataFrame({"i": local, "j": sub["j"].values, "y": sub["y"].values, "score": oof})
     nt = pd.Series(n_true.values[pos], index=np.arange(n_model))
     params, f_oof = tune_rule(c, nt, np.arange(n_model))
-    return models, list(X.columns), params, f_oof
+    # per-country OOF score with the tuned rule (honest when cv=country)
+    from decide import macro_f05_fast
+    pr = apply_rule(c, *params)
+    cn_s1 = s1_tr["country"].values[pos]
+    per = {}
+    for cty in sorted(set(cn_s1)):
+        idx = np.flatnonzero(cn_s1 == cty)
+        per[cty] = round(macro_f05_fast(pr[np.isin(pr["i"].values, idx)], nt, idx), 5)
+    log(f"OOF per country {per}")
+    info = {"oof_macro_f05": f_oof, "params": params, "per_country": per, "cv": args.cv,
+            "n_features": X.shape[1], "best_iters": [m.best_iteration for m in models]}
+    with open(os.path.join(report_dir, "oof.json"), "w") as f:
+        json.dump(info, f, indent=2)
+    final = None
+    if not args.oof_only:
+        rounds = int(np.mean([m.best_iteration for m in models]) * 1.1)
+        log(f"training final model on all {len(y)} pairs, {rounds} rounds")
+        final = train_full(X, y, rounds)
+    return [final] if final else models, list(X.columns), params, f_oof, (tok_neg, tok_pos)
 
 
-def predict_lgbm(cand, s1, pool, models, cols):
+def predict_lgbm(cand, s1, pool, models, cols, tok):
     """Score test candidates chunk by chunk (whole S1 groups per chunk)."""
     cand = pd.concat([cand, global_context(cand)], axis=1)
     cand = cand.sort_values("i", kind="stable").reset_index(drop=True)
@@ -114,7 +161,11 @@ def predict_lgbm(cand, s1, pool, models, cols):
     for a, b in zip(bounds[:-1], bounds[1:]):
         if a == b:
             continue
-        f = chunk_features(cand.iloc[a:b], s1, pool)
+        c = cand.iloc[a:b]
+        f = pd.concat([chunk_features(c, s1, pool), cluster_features(c, s1, pool)], axis=1)
+        if tok[0] is not None:
+            xf, _ = extra_feats(c, s1, pool, *tok)
+            f = pd.concat([f, xf], axis=1)
         score[a:b] = predict(models, f[cols])
         log(f"  scored pairs {b}/{len(cand)}")
     cand["score"] = score
@@ -129,6 +180,10 @@ def main():
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--mode", choices=["lgbm", "rule"], default="lgbm")
     ap.add_argument("--model-s1", type=int, default=config.MODEL_S1)
+    ap.add_argument("--cv", choices=["group", "country"], default="group",
+                    help="country = leave-one-country-out folds (unseen-country simulation)")
+    ap.add_argument("--oof-only", action="store_true",
+                    help="stop after OOF scoring on the train dir (no test inference)")
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
                     help="number of train S1 records used for tuning (full train pool is kept)")
     args = ap.parse_args()
@@ -136,8 +191,10 @@ def main():
 
     report_dir = os.path.join(args.out_dir, "report")
     if args.mode == "lgbm":
-        models, cols, params, f_tr = fit_lgbm(args, report_dir)
+        models, cols, params, f_tr, tok = fit_lgbm(args, report_dir)
         log(f"OOF tuned params {params}, OOF macroF0.5 {f_tr:.4f}")
+        if args.oof_only:
+            return
     else:
         params, f_tr = fit_rule(args)
 
@@ -147,7 +204,7 @@ def main():
     log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
     cand_te = blocking_cached(s1_te, pool_te, "test")
     if args.mode == "lgbm":
-        cand_te = predict_lgbm(cand_te, s1_te, pool_te, models, cols)
+        cand_te = predict_lgbm(cand_te, s1_te, pool_te, models, cols, tok)
     else:
         cand_te["score"] = baseline_score(cand_te)
     pred = apply_rule(cand_te, *params)
