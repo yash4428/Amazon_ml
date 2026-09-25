@@ -370,3 +370,69 @@ def load_normalized(data_dir, prefix, n_jobs=1):
         frames.append(normalize_cached(df, os.path.join(config.CACHE_DIR, f"norm_s{n}.parquet"),
                                        n_jobs=n_jobs))
     return frames[0], pd.concat(frames[1:], ignore_index=True)
+
+
+# --------------------------------------------------------------------------
+# Learned transliteration dictionary (from TRAIN pairs only).
+# Indic-script names are transliterated phonetically above ("pharst oyan
+# bildars"); the training ground truth contains many (Latin S1, native-script
+# S2/S3) pairs of the same business, whose name tokens align position by
+# position. We count source->target token pairs and keep confident mappings
+# (pharst -> first, bildars -> builders). Only used on names that contained
+# Indic characters. No external data.
+# --------------------------------------------------------------------------
+_HAS_INDIC = re.compile(r"[ऀ-ൿ]")
+
+
+def build_translit_dict(s1, pool, truth, min_count=3, min_share=0.6):
+    """Learn transliterated-token -> English-token map from true (Latin S1, Indic pool) pairs."""
+    from collections import Counter, defaultdict
+    s1_name = dict(zip(s1["entity_id"], s1["name_norm"]))
+    s1_raw = dict(zip(s1["entity_id"], s1["business_name"]))
+    idx = pool.set_index("entity_id")
+    native = idx[idx["business_name"].map(lambda t: bool(_HAS_INDIC.search(t)))]
+    nat_name = dict(zip(native.index, native["name_norm"]))
+    counts = defaultdict(Counter)
+    for s, xs in truth.items():
+        if s not in s1_name or _HAS_INDIC.search(s1_raw[s]):
+            continue
+        t1 = s1_name[s].split()
+        for x in xs:
+            if x in nat_name:
+                t2 = nat_name[x].split()
+                if len(t1) == len(t2):
+                    for a, b in zip(t2, t1):
+                        if a != b:
+                            counts[a][b] += 1
+    out = {}
+    for a, cnt in counts.items():
+        b, n = cnt.most_common(1)[0]
+        tot = sum(cnt.values())
+        if n >= min_count and n / tot >= min_share:
+            out[a] = b
+    return out
+
+
+def apply_translit_dict(df, mapping):
+    """Rewrite name fields of Indic-script records using the learned token map (in place copy)."""
+    if not mapping:
+        return df
+    m = df["business_name"].map(lambda t: bool(_HAS_INDIC.search(t))).values
+    if not m.any():
+        return df
+    df = df.copy()
+    norm = []
+    for n in df.loc[m, "name_norm"].values:
+        norm.append(" ".join(mapping.get(t, t) for t in n.split()))
+    core, compact, acro = [], [], []
+    for n in norm:
+        toks = n.split()
+        c = [x for x in toks if x not in _LEGAL_EXPANDED and x not in FILLER] or toks
+        core.append(" ".join(c))
+        compact.append("".join(c))
+        acro.append("".join(x[0] for x in c if x and not x.isdigit()) if len(c) > 1 else "")
+    df.loc[m, "name_norm"] = norm
+    df.loc[m, "name_core"] = core
+    df.loc[m, "name_compact"] = compact
+    df.loc[m, "acronym"] = acro
+    return df

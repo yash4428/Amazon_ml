@@ -1,10 +1,16 @@
 # PROGRESS
 
 ## Now
-- Current step: Step 5 — LightGBM. EXP02 (lgbm on val, 400k train S1 for the model, blocking on full train part) running -> runs/val_lgbm, log runs/val_lgbm_run.log.
-- Day-1 submission READY: submissions/day1_1 (rule baseline, validator+sanity PASS). 🛑 Yash to upload `output/matching_results.tsv` and report the public score (log in submissions/log.md).
-- Next action: score EXP02 on val; if good run loco_india/loco_us with lgbm; then error analysis.
-- Current best: exp01_rule_baseline val=0.7730 locoIN=0.6943 locoUS=0.6951 (tag sub-day1-1). Smoke test: lgbm OOF 0.937 on 5k S1.
+- Day-1 public LB: day1_1 rule baseline = **0.679** (local val said 0.773 -> val split is OPTIMISTIC, see Key finding).
+- Running: exp03 full run dataset/train -> dataset/test (runs/exp03_test, log runs/exp03_test.log). Its OOF (full train, all distractors) is the honest estimate. -> submission day1_2.
+- Next: validate + sanity exp03 output, copy to submissions/day1_2; then `--cv country --oof-only` on dataset/train for the unseen-country check.
+- Leaderboard context (25 Sep evening): top 0.9869, top-15 > 0.984, top-100 > 0.97.
+
+## KEY FINDING (25 Sep 19:00) — how to evaluate
+- Hard negatives are synthetic *sibling branches* of an S1 ("nobody"-owned pool records): same name + branch word (group, holdings, ventures, east, riverside, downtown, infratech, exports...) and a CHANGED house number (30->34, 8520->8527). 80% of singletons' top candidate is such a record.
+- In the random `val` split these distractors are assigned randomly (80% go to the train side), so val S1s lose most of their hard negatives -> val is optimistic (rule: val 0.773 vs public 0.679; loco 0.694; train-part OOF tuning 0.680 ≈ public).
+- => **Trust OOF on the full dataset/train (all distractors present) and country-CV OOF. Do NOT use val/val2 scores for decisions.**
+- Extra-token stats (train, top-5 candidates): tokens like group/holdings/ventures/public/exports/overseas/infratech/east/metro/valley... occur only on negatives (0.0 on positives); center/service/labs/"doing business as" occur on positives. House first number equal: pos 68%, nobody-distractor 6%.
 
 ## Environment
 - Machine: Apple M4 Pro, 12 cores, 24 GB RAM, no NVIDIA GPU (Apple MPS only), ~140 GB free disk.
@@ -52,10 +58,12 @@
 ## Experiments
 | tag | change | val | loco_india | loco_us | oracle | notes |
 |---|---|---|---|---|---|---|
-| exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | 0.6943 | 0.6951 | 0.9934 | singleton acc 0.60, micro P 0.94 / R 0.52 |
+| exp01_rule_baseline | max(combo_sim, 0.8*name_c4_sim), o2o, t1=0.58 t2=0.82 | 0.7730 | 0.6943 | 0.6951 | 0.9934 | public 0.679; tune-OOF 0.680 |
+| exp02_lgbm | LightGBM 53 feats, 400k S1, lr .05 | OOF(val-train) 0.9622 | - | - | - | rank_cand dominates gain |
+| exp03 smoke | + xtok encoding + house cluster feats, 20k S1, lr .08 leaves 127 | OOF(val-train) 0.9650 | India OOF 0.951 | US OOF 0.974 | - | t1=0.78 t2=0.02 r=0.75 |
 
 ## Submissions (day, slot, tag, local val, public LB score)
-- day1_1 | exp01_rule_baseline | val 0.7730 | public: pending
+- day1_1 | exp01_rule_baseline | val 0.7730 | **public 0.679**
 
 ## Ideas backlog (ranked)
 1. Address char-TF-IDF + rare-token blocking (names alone fail for ~8-24% of pairs).

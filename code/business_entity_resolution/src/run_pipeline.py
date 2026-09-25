@@ -20,11 +20,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
-from features import (chunk_features, cluster_features, encode_extras,  # noqa: E402
-                      global_context, pair_extras, token_counts)
+from features import (add_dup_counts, chunk_features, cluster_features,  # noqa: E402
+                      dup_features, encode_extras, global_context, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
-from normalize import load_normalized  # noqa: E402
+from normalize import apply_translit_dict, build_translit_dict, load_normalized  # noqa: E402
 
 
 def log(msg):
@@ -36,6 +36,7 @@ def blocking_cached(s1, pool, tag):
     """Run blocking, caching the candidate frame by (record ids, blocking config)."""
     h = hashlib.md5()
     h.update(json.dumps(config.BLOCKING, sort_keys=True).encode())
+    h.update(str(config.NORM_VERSION).encode())
     h.update(str(len(s1)).encode() + str(len(pool)).encode())
     h.update(",".join(s1["entity_id"].iloc[:: max(1, len(s1) // 1000)]).encode())
     h.update(",".join(pool["entity_id"].iloc[:: max(1, len(pool) // 1000)]).encode())
@@ -88,6 +89,10 @@ def fit_lgbm(args, report_dir):
     log("loading train")
     s1_tr, pool_tr = load_normalized(args.train_dir, "train", n_jobs=config.N_JOBS)
     truth = read_truth(args.train_dir, "train")
+    tl = build_translit_dict(s1_tr, pool_tr, truth) if config.USE_TRANSLIT_DICT else {}
+    log(f"learned transliteration dict: {len(tl)} tokens")
+    s1_tr, pool_tr = apply_translit_dict(s1_tr, tl), apply_translit_dict(pool_tr, tl)
+    s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
     log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
     cand = blocking_cached(s1_tr, pool_tr, "train")
     cand = pd.concat([cand, global_context(cand)], axis=1)
@@ -106,7 +111,7 @@ def fit_lgbm(args, report_dir):
     else:
         fold = group_folds(sub["i"].values)
     X = chunk_features(sub, s1_tr, pool_tr)
-    X = pd.concat([X, cluster_features(sub, s1_tr, pool_tr)], axis=1)
+    X = pd.concat([X, cluster_features(sub, s1_tr, pool_tr), dup_features(sub, s1_tr, pool_tr)], axis=1)
     if config.USE_XTOK:
         ex = pair_extras(sub, s1_tr, pool_tr)
         xf = np.zeros((len(sub), 3), np.float32)
@@ -143,12 +148,17 @@ def fit_lgbm(args, report_dir):
             "n_features": X.shape[1], "best_iters": [m.best_iteration for m in models]}
     with open(os.path.join(report_dir, "oof.json"), "w") as f:
         json.dump(info, f, indent=2)
+    dump = c.assign(s1=s1_tr["entity_id"].values[sub["i"].values],
+                    x=pool_tr["entity_id"].values[sub["j"].values])
+    dump.to_parquet(os.path.join(report_dir, "oof_pairs.parquet"), index=False)
+    pd.DataFrame({"s1": s1_tr["entity_id"].values[pos], "n_true": nt.values}).to_parquet(
+        os.path.join(report_dir, "oof_s1.parquet"), index=False)
     final = None
     if not args.oof_only:
         rounds = int(np.mean([m.best_iteration for m in models]) * 1.1)
         log(f"training final model on all {len(y)} pairs, {rounds} rounds")
         final = train_full(X, y, rounds)
-    return [final] if final else models, list(X.columns), params, f_oof, (tok_neg, tok_pos)
+    return [final] if final else models, list(X.columns), params, f_oof, (tok_neg, tok_pos), tl
 
 
 def predict_lgbm(cand, s1, pool, models, cols, tok):
@@ -162,7 +172,8 @@ def predict_lgbm(cand, s1, pool, models, cols, tok):
         if a == b:
             continue
         c = cand.iloc[a:b]
-        f = pd.concat([chunk_features(c, s1, pool), cluster_features(c, s1, pool)], axis=1)
+        f = pd.concat([chunk_features(c, s1, pool), cluster_features(c, s1, pool),
+                       dup_features(c, s1, pool)], axis=1)
         if tok[0] is not None:
             xf, _ = extra_feats(c, s1, pool, *tok)
             f = pd.concat([f, xf], axis=1)
@@ -191,7 +202,7 @@ def main():
 
     report_dir = os.path.join(args.out_dir, "report")
     if args.mode == "lgbm":
-        models, cols, params, f_tr, tok = fit_lgbm(args, report_dir)
+        models, cols, params, f_tr, tok, tl = fit_lgbm(args, report_dir)
         log(f"OOF tuned params {params}, OOF macroF0.5 {f_tr:.4f}")
         if args.oof_only:
             return
@@ -201,6 +212,9 @@ def main():
     # ---------------- inference on the test part
     log("loading test")
     s1_te, pool_te = load_normalized(args.test_dir, "test", n_jobs=config.N_JOBS)
+    if args.mode == "lgbm":
+        s1_te, pool_te = apply_translit_dict(s1_te, tl), apply_translit_dict(pool_te, tl)
+        s1_te, pool_te = add_dup_counts(s1_te, pool_te)
     log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
     cand_te = blocking_cached(s1_te, pool_te, "test")
     if args.mode == "lgbm":
@@ -232,6 +246,11 @@ def write_run(args, s1_te, pool_te, cand_te, pred, params, f_tr):
 
     s1_ids = s1_te["entity_id"].values
     pool_ids = pool_te["entity_id"].values
+    os.makedirs(args.out_dir, exist_ok=True)
+    pd.DataFrame({"s1": s1_ids[cand_te["i"].values], "x": pool_ids[cand_te["j"].values],
+                  "i": cand_te["i"].values, "j": cand_te["j"].values,
+                  "score": cand_te["score"].values}).to_parquet(
+        os.path.join(args.out_dir, "test_scores.parquet"), index=False)
     candidates = group_ids(cand_te, s1_ids, pool_ids)
     matches = group_ids(pred, s1_ids, pool_ids)
     write_outputs(args.out_dir, list(s1_ids), matches, candidates)

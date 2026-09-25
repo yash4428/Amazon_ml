@@ -217,3 +217,24 @@ def cluster_features(c, s1, pool):
     out["house_cluster_size"] = np.where(f2 == "", 0, grp - 1).astype(np.float32)
     out["n_cand_house_eq_s1"] = tmp.groupby("i")["eq"].transform("sum").values.astype(np.float32)
     return pd.DataFrame(out, index=c.index)
+
+
+def add_dup_counts(s1, pool):
+    """Name-ambiguity counts (unsupervised): how many S1 records share each core name.
+
+    s1["dup_s1"]   : number of S1 records (same country) with this S1's core name
+    pool["dup_s1"] : number of S1 records (same country) with this candidate's core name
+    A name-only candidate (empty address) is only safe when its name is unique among S1.
+    """
+    key_s1 = s1["country"] + "|" + s1["name_core"]
+    vc = key_s1.value_counts()
+    s1 = s1.assign(dup_s1=key_s1.map(vc).values.astype(np.float32))
+    key_p = pool["country"] + "|" + pool["name_core"]
+    pool = pool.assign(dup_s1=key_p.map(vc).fillna(0).values.astype(np.float32))
+    return s1, pool
+
+
+def dup_features(c, s1, pool):
+    """Per-pair name-ambiguity features from add_dup_counts columns."""
+    return pd.DataFrame({"s1_name_dup": s1["dup_s1"].values[c["i"].values],
+                         "cand_name_dup": pool["dup_s1"].values[c["j"].values]}, index=c.index)
