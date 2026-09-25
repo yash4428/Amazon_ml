@@ -21,7 +21,8 @@ import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
 from features import (add_dup_counts, chunk_features, cluster_features,  # noqa: E402
-                      dup_features, encode_extras, global_context, pair_extras, token_counts)
+                      dup_features, encode_extras, global_context, hmis_features,
+                      house_mismatch_token_rates, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
 from normalize import apply_translit_dict, build_translit_dict, load_normalized  # noqa: E402
@@ -52,7 +53,8 @@ def blocking_cached(s1, pool, tag):
 
 def baseline_score(c):
     """Rule-based pair score: the combined name+address cosine, backed off to name char sim."""
-    return np.maximum(c["combo_sim"].values, 0.8 * c["name_c4_sim"].values)
+    c4 = c["name_c4_sim"].values if "name_c4_sim" in c else 0.0
+    return np.maximum(c["combo_sim"].values, 0.8 * c4)
 
 
 def label_pairs(cand, s1, pool, truth):
@@ -95,6 +97,8 @@ def fit_lgbm(args, report_dir):
     s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
     log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
     cand = blocking_cached(s1_tr, pool_tr, "train")
+    hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
+    log(f"house-mismatch token rates: {len(hm_rates)} tokens")
     cand = pd.concat([cand, global_context(cand)], axis=1)
     rng = np.random.RandomState(config.SEED)
     n_model = min(args.model_s1, len(s1_tr))
@@ -112,8 +116,9 @@ def fit_lgbm(args, report_dir):
         fold = group_folds(sub["i"].values)
     X = chunk_features(sub, s1_tr, pool_tr)
     X = pd.concat([X, cluster_features(sub, s1_tr, pool_tr), dup_features(sub, s1_tr, pool_tr)], axis=1)
+    ex = pair_extras(sub, s1_tr, pool_tr)
+    X["hmis_max"], X["hmis_mean"] = hmis_features(ex, hm_rates)
     if config.USE_XTOK:
-        ex = pair_extras(sub, s1_tr, pool_tr)
         xf = np.zeros((len(sub), 3), np.float32)
         for k in np.unique(fold):
             m = fold == k
@@ -163,6 +168,8 @@ def fit_lgbm(args, report_dir):
 
 def predict_lgbm(cand, s1, pool, models, cols, tok):
     """Score test candidates chunk by chunk (whole S1 groups per chunk)."""
+    hm_rates = house_mismatch_token_rates(cand, s1, pool)
+    log(f"test house-mismatch token rates: {len(hm_rates)} tokens")
     cand = pd.concat([cand, global_context(cand)], axis=1)
     cand = cand.sort_values("i", kind="stable").reset_index(drop=True)
     score = np.zeros(len(cand), np.float32)
@@ -174,6 +181,8 @@ def predict_lgbm(cand, s1, pool, models, cols, tok):
         c = cand.iloc[a:b]
         f = pd.concat([chunk_features(c, s1, pool), cluster_features(c, s1, pool),
                        dup_features(c, s1, pool)], axis=1)
+        ex = pair_extras(c, s1, pool)
+        f["hmis_max"], f["hmis_mean"] = hmis_features(ex, hm_rates)
         if tok[0] is not None:
             xf, _ = extra_feats(c, s1, pool, *tok)
             f = pd.concat([f, xf], axis=1)

@@ -20,11 +20,17 @@ a = ap.parse_args()
 d = os.path.join(config.ROOT, "splits", a.split, "train")
 s1, pool = load_normalized(d, "train", n_jobs=config.N_JOBS)
 truth = read_truth(d)
+from normalize import build_translit_dict, apply_translit_dict
+if os.environ.get("TL", "1") == "1":
+    tl = build_translit_dict(s1, pool, truth); s1, pool = apply_translit_dict(s1, tl), apply_translit_dict(pool, tl)
+    print("translit dict", len(tl))
 if a.country:
     s1 = s1[s1.country == a.country]
 s1 = s1.sample(min(a.n, len(s1)), random_state=config.SEED).reset_index(drop=True)
 kmax = max(int(x) for x in a.k.split(","))
-gens = {g: dict(v, k=kmax) for g, v in config.BLOCKING.items() if not a.gens or g in a.gens.split(",")}
+ALL = dict(config.BLOCKING, combo_c=dict(space="combo_c", k=20, max_df=20000),
+           addr_tok=dict(space="addr_tok", k=20, max_df=5000), name_bi=dict(space="name_bi", k=20, max_df=5000))
+gens = {g: dict(v, k=kmax) for g, v in ALL.items() if not a.gens or g in a.gens.split(",")}
 if a.maxdf:
     for g in gens: gens[g]["max_df"] = int(a.maxdf)
 t = time.time()

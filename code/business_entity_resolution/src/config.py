@@ -12,18 +12,18 @@ CACHE_DIR = os.path.join(ROOT, "cache")
 # Each generator: feature space, top-K per S1, max document frequency (within
 # one country, over S1+pool) for a feature to be used for retrieval.
 BLOCK_CHUNK = 2000            # S1 rows per sparse-matmul chunk
-# Chosen on the val train-part (30k S1): combo@20 + name_c4@10 -> pair recall 0.967,
-# oracle 0.988, 26.6 cand/S1. Other spaces (name_bi, name_tok, addr_tok) add <=0.002.
+# exp05 (with learned translit): combo_c@25 + combo@15 -> recall 0.9813, oracle 0.9938,
+# 30.0 cand/S1 (was combo@20 + name_c4@10: 0.9735 @ 26.6). See PROGRESS.md table.
 BLOCKING = {
-    "combo":     dict(space="combo",     k=20, max_df=20000),
-    "name_c4":   dict(space="name_c4",   k=10, max_df=5000),
+    "combo_c":   dict(space="combo_c",   k=25, max_df=20000),
+    "combo":     dict(space="combo",     k=15, max_df=20000),
 }
 
 # ---------------------------------------------------------------- tuning
 TUNE_S1 = 300_000             # train S1 sampled for threshold tuning (full train pool kept)
 
 # ---------------------------------------------------------------- model
-MODEL_S1 = 250_000            # train S1 records used to fit the pair model (sampled, seeded)
+MODEL_S1 = 300_000            # train S1 records used to fit the pair model (sampled, seeded)
 USE_XTOK = True               # learned extra-name-token encoding feature
 USE_TRANSLIT_DICT = True      # learned Indic-transliteration -> English token map (train pairs)
 NORM_VERSION = 2              # bump when normalisation changes (invalidates blocking cache)

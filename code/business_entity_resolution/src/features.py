@@ -108,7 +108,8 @@ def context_features(c, score_col, cand_side=True):
 
 def global_context(cand):
     """Blocking-score context features over the FULL candidate set (all S1)."""
-    parts = [context_features(cand, "combo_sim"), context_features(cand, "name_c4_sim")]
+    sims = [c for c in cand.columns if c.endswith("_sim")]
+    parts = [context_features(cand, c) for c in sims]
     out = pd.concat(parts, axis=1)
     out["n_cand_s1"] = cand.groupby("i")["j"].transform("size").values.astype(np.float32)
     return out.add_prefix("ctx_")
@@ -238,3 +239,41 @@ def dup_features(c, s1, pool):
     """Per-pair name-ambiguity features from add_dup_counts columns."""
     return pd.DataFrame({"s1_name_dup": s1["dup_s1"].values[c["i"].values],
                          "cand_name_dup": pool["dup_s1"].values[c["j"].values]}, index=c.index)
+
+
+def house_mismatch_token_rates(cand, s1, pool, top=5, min_n=20):
+    """Unsupervised branch-word detector (no labels; works for unseen countries).
+
+    Over the dataset's own top candidate pairs where both sides have a house
+    number, measure for every extra name token (candidate token not in the S1
+    name) how often it co-occurs with a DIFFERENT first house number. Branch
+    words of fake sibling branches (east, holdings, distribution, ...) come with
+    changed numbers; noise words on true copies (inc, center, sarl) do not.
+    Returns dict token -> (mismatch rate, count) for tokens seen >= min_n times.
+    """
+    c = cand[cand["combo_rank"] < top] if "combo_rank" in cand else cand
+    h1 = s1["house_numbers"].values[c["i"].values]
+    h2 = pool["house_numbers"].values[c["j"].values]
+    n1 = s1["name_core"].values[c["i"].values]
+    n2 = pool["name_core"].values[c["j"].values]
+    mis, tot = {}, {}
+    for a, b, x, y in zip(h1, h2, n1, n2):
+        if not a or not b:
+            continue
+        m = a.split(" ", 1)[0] != b.split(" ", 1)[0]
+        for w in set(y.split()) - set(x.split()):
+            tot[w] = tot.get(w, 0) + 1
+            if m:
+                mis[w] = mis.get(w, 0) + 1
+    return {w: (mis.get(w, 0) / n, n) for w, n in tot.items() if n >= min_n}
+
+
+def hmis_features(extras, rates, base=0.25):
+    """Max / mean house-mismatch rate over a pair's extra tokens (``base`` if none known)."""
+    mx = np.zeros(len(extras), np.float32)
+    mean = np.zeros(len(extras), np.float32)
+    for k, ex in enumerate(extras):
+        v = [rates[w][0] for w in ex if w in rates]
+        mx[k] = max(v) if v else base
+        mean[k] = sum(v) / len(v) if v else base
+    return mx, mean

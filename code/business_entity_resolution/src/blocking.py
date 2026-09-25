@@ -64,7 +64,15 @@ def an_name_bi(row):
     return list(set(out))
 
 
+def an_combo_c(row):
+    """Name char 4-grams (typo-robust) + address unigrams/bigrams in one space."""
+    s = "^" + row[0] + "$"
+    grams = {"n:" + s[i:i + 4] for i in range(max(1, len(s) - 3))}
+    return list(grams | set(_uni_bi(row[1].split(), "a:")))
+
+
 SPACES = {
+    "combo_c": (an_combo_c, ["name_compact", "addr_norm"]),
     "combo": (an_combo, ["name_core", "addr_norm"]),
     "name_bi": (an_name_bi, ["name_core", "dba"]),
     "name_tok": (an_name_tok, ["name_core", "dba"]),
