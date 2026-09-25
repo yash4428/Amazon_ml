@@ -248,6 +248,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   are same-address (same house 76%) with a swapped generic word (e.g. "Forge Sport SARL" -> "Forge Parents SARL") —
   in train such swaps are 98% true matches. => France loss was partly RECALL; crowd training recovers it.
   **day2_best := exp10** (exp09 kept as submissions/day2_exp09_wide).
+- 03:30 exp11 (exp10 config, seed+1, 400k S1) crowded OOF 0.9794 (IN .9761 US .9816).
+- 03:42 blend 0.5·exp10 + 0.5·exp11 on the 54k common OOF S1: 0.97935 (exp10 0.97887, exp11 0.97907).
+  Validator+sanity PASS. **day2_best := blend_10_11** (t1 .70 t2 .72 r 0; 11.9 cand/S1).
+- 03:44 exp12 launched (seed+2, 400k S1, crowd 0.5) for a 3-way blend.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------

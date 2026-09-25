@@ -16,9 +16,21 @@ if a.params_from:
     print("fixed blend", best)
 else:
   oa = pd.read_parquet(f"{a.a}/report/oof_pairs.parquet"); ob = pd.read_parquet(f"{a.b}/report/oof_pairs.parquet")
-  m = oa.merge(ob[["s1", "x", "score"]], on=["s1", "x"], how="inner", suffixes=("_a", "_b"))
-  print("aligned OOF pairs", len(m), "of", len(oa), len(ob))
-  s = pd.read_parquet(f"{a.a}/report/oof_s1.parquet"); nt = pd.Series(s.n_true.values, index=np.arange(len(s)))
+  sa = pd.read_parquet(f"{a.a}/report/oof_s1.parquet"); sb = pd.read_parquet(f"{a.b}/report/oof_s1.parquet")
+  common = sorted(set(sa.s1) & set(sb.s1))          # S1 present in both OOF samples
+  loc = {x: k for k, x in enumerate(common)}
+  m = oa[oa.s1.isin(loc)].merge(ob[["s1", "x", "score"]], on=["s1", "x"], how="outer", suffixes=("_a", "_b"))
+  m = m[m.s1.isin(loc)]
+  m["y"] = m["y"].fillna(False).astype(bool) if "y" in m else False
+  yb = ob.set_index(["s1", "x"])["y"]
+  miss = m["y"].isna() if m["y"].dtype == object else pd.Series(False, index=m.index)
+  m["score_a"] = m["score_a"].fillna(0.0); m["score_b"] = m["score_b"].fillna(0.0)
+  m["i"] = m.s1.map(loc).values; m["j"] = pd.factorize(m.x)[0]
+  ytrue = pd.concat([oa[["s1", "x", "y"]], ob[["s1", "x", "y"]]]).drop_duplicates(["s1", "x"]).set_index(["s1", "x"])["y"]
+  m["y"] = ytrue.reindex(pd.MultiIndex.from_frame(m[["s1", "x"]])).fillna(False).values.astype(bool)
+  nt = pd.Series(sa.set_index("s1").n_true.reindex(common).values, index=np.arange(len(common)))
+  s = pd.DataFrame({"s1": common})
+  print("common OOF S1", len(common), "pairs", len(m))
   best = (None, -1, None)
   for w in ([a.w] if a.w is not None else [0.0, 0.3, 0.5, 0.7, 1.0]):
       c = m.assign(score=w * m.score_a + (1 - w) * m.score_b)
