@@ -1,0 +1,24 @@
+{
+  "mode": "rule",
+  "params": [
+    0.58,
+    0.82,
+    0.0
+  ],
+  "train_macro_f05": 0.679968135754999,
+  "blocking": {
+    "combo": {
+      "space": "combo",
+      "k": 20,
+      "max_df": 20000
+    },
+    "name_c4": {
+      "space": "name_c4",
+      "k": 10,
+      "max_df": 5000
+    }
+  },
+  "n_s1": 1732544,
+  "n_pred_pairs": 3899619,
+  "n_cand_pairs": 45930343
+}

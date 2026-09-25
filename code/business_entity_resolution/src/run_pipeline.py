@@ -127,7 +127,7 @@ def main():
     ap.add_argument("--train-dir", required=True)
     ap.add_argument("--test-dir", required=True)
     ap.add_argument("--out-dir", required=True)
-    ap.add_argument("--mode", choices=["lgbm", "rule"], default="rule")
+    ap.add_argument("--mode", choices=["lgbm", "rule"], default="lgbm")
     ap.add_argument("--model-s1", type=int, default=config.MODEL_S1)
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
                     help="number of train S1 records used for tuning (full train pool is kept)")

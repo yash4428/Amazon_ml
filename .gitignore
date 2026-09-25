@@ -11,3 +11,5 @@ models_cache/
 *.npz
 *.pkl
 output/*.tsv
+
+submissions/*/*.tsv
