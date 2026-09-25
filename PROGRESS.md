@@ -147,6 +147,7 @@ Caches (gitignored, safe to delete, rebuilt automatically): `cache/norm_s{1,2,3}
 | blend | 0.5·exp06 + 0.5·exp07 | (blend05/06 OOF 0.97726) | – | **0.964** | day1_5 |
 | exp08 | exp06 + `--crowd 0.5` | stopped after caching crowded blocking | – | – | used by crowd_eval |
 | exp09 | wide blocking c60+c30 + stage-1 (~11/S1, recall .9819) | **0.9795** | IN .9763 US .9817 | – | 2.7× fewer candidates |
+| exp10 | exp09 + crowd 0.5 (train-time synthetic branches) | 0.9789 (crowded OOF) | IN .9756 US .9811 | – | expected best on test |
 
 Blocking tables (30k train-part S1, with learned translit):
 - combo20+c4_10 0.9735 @26.6/S1 · combo_c20+combo10 0.9770 @22.5 · **combo_c25+combo15 0.9813 @30.0** ·
@@ -238,6 +239,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   model B (trained with +50% synthetic fake branches) — normal val 0.9743, **crowded val 0.9741** (+0.0031 vs A).
   Test is crowded (US +54%, IN +38% branch-like, France ≫) → **use crowd training**. B tunes stricter t1 (0.82 vs 0.76).
 - 02:10 exp10 launched = exp09 + `--crowd 0.5` (test candidates reused from exp09 cache).
+- 03:01 **exp10 OOF 0.9789** (IN .9756 US .9811) under CROWDED train conditions (+50% synthetic branches);
+  recall after stage-1 0.9811 at 12 cand/S1. exp09 0.9795 was measured under normal conditions; the A/B implies an
+  exp09-type model loses ~0.005 under crowding (→ ~0.975), so exp10 is expected ~+0.004 better on test.
+- 03:05 queued exp11 (exp10 config, sample-seed 1, 400k S1) for a blend.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
