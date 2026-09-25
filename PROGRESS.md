@@ -1,11 +1,19 @@
 # PROGRESS
 
-## Now (25 Sep 22:45 IST)
-- Public: day1_1 0.679 | day1_2 exp04 0.955 | day1_3 France-empty probe 0.831 | day1_4 exp05 0.963. Leader ~0.986; we are ~300th.
-- **France probe => France ≈ 0.88 (exp04), ≈ 0.91 (exp05); US+India ≈ 0.968-0.972 on test.** France is ~70% of our gap.
-- Final slot tonight: exp07 (exp06 feats, 600k S1, no CV, 750 rounds, params from exp06) blended 50/50 with exp06
-  -> runs/blend_final. Fallback: submissions/day1_5_exp06 (validator+sanity PASS).
-- exp06 OOF 0.9771 (blend exp05+06 OOF 0.97726). exp06 changes France predictions 2.3x more than US/India (branch_sig targets France FPs).
+## Now (25 Sep 23:45 IST) — Day 1 done, all 5 slots used
+- Public: day1_1 0.679 | day1_2 exp04 0.955 | day1_3 France-empty probe 0.831 | day1_4 exp05 0.963 | day1_5 blend exp06+exp07 **0.964**. Leader 0.9884; we are ~300th.
+- Gap to leader: France (15%) ≈ 0.15×(0.986−0.91) ≈ 0.011; US+India (85%) ≈ 0.85×(0.986−0.97) ≈ 0.014 -> **US/India matter as much as France**.
+
+## ROOT CAUSE (25 Sep 23:40): test is a denser-distractor distribution than train
+- Per S1 (60k sample): branch-like candidates (same street, house nudged <=30): train US 1.02 / India 1.37; **test US 1.58 (+54%), India 1.89 (+38%), France 9.2**. Copy-like candidates (same house no., name tset>=80) unchanged (~2.0; France 2.7). True matches/S1 in train 3.46; predicted/S1 on test same as train.
+- => Test has ~1.4-1.5x more fake branches (France far more). Effects: (1) blocking top-K gets crowded -> true copies dropped (France matches sit near K 3x more); (2) model prior learned at train density -> more FPs.
+- Feature tweaks (exp06/07) gave only +0.001 public: we were optimising under train conditions.
+
+## Day 2 plan (supersedes list below)
+1. Wider blocking (~2x K) + cheap stage-1 filter (few rapidfuzz feats) back to ~10 cand/S1 (email). Validate recall under SIMULATED crowding (inject extra branch-like negatives into train candidate lists).
+2. Density-robust training/decision: weight nobody-type negatives ~1.5x; tune thresholds on OOF with branch-type negatives duplicated to test ratio.
+3. Select changes by group-OOF AND country-held-out OOF.
+4. Optional: small transformer reranker on the ~5% borderline pairs (licence-checked model; ask Yash before adding).
 
 ## Day 2 priorities (from tonight's evidence)
 1. FRANCE. Blocking: France accepted matches sit deep in candidate ranks 3x more than US (rank 18-24: 1.26% vs 0.40%; found only by `combo`: 2.06% vs 0.65%) -> true copies are cut by K. Raise K (esp. dense countries) / make max_df relative to pool size, then a stage-1 filter to keep cand/S1 small (organiser email).
