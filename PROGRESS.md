@@ -230,6 +230,9 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 00:58 train blocking + stage-1: India 60.8M -> 9.9M pairs (11.2/S1), US 94.9M -> 14.6M (11.0/S1).
   **Recall after stage-1 on the 300k model sample: 0.9819 at ~11 cand/S1** (exp05: 0.9756 at 30/S1).
 - 01:04 **exp09 OOF 0.9795** (India 0.9763, US 0.9817) vs exp06 0.9771 → +0.0024. Params t1=0.70 t2=0.74 r=0.
+- 01:41 exp09 test written: 20.6M candidate pairs = **11.9 cand/S1** (France 16.7, India 11.6, US 10.4; was 29.5).
+  Validator PASS, sanity PASS (empty 0.056; France 0.055 / 3.28 matches per row). **Packaged as submissions/day2_best**.
+- 01:41 crowd_eval started (A/B of crowded training, 120k S1, 3 folds).
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
