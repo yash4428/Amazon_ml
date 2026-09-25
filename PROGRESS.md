@@ -146,7 +146,7 @@ Caches (gitignored, safe to delete, rebuilt automatically): `cache/norm_s{1,2,3}
 | exp07 | exp06 feats, 600k S1 (seed+1), no CV | – | – | – | |
 | blend | 0.5·exp06 + 0.5·exp07 | (blend05/06 OOF 0.97726) | – | **0.964** | day1_5 |
 | exp08 | exp06 + `--crowd 0.5` | stopped after caching crowded blocking | – | – | used by crowd_eval |
-| exp09 | wide blocking c60+c30 + stage-1 (~10/S1) | running overnight | | | |
+| exp09 | wide blocking c60+c30 + stage-1 (~11/S1, recall .9819) | **0.9795** | IN .9763 US .9817 | – | 2.7× fewer candidates |
 
 Blocking tables (30k train-part S1, with learned translit):
 - combo20+c4_10 0.9735 @26.6/S1 · combo_c20+combo10 0.9770 @22.5 · **combo_c25+combo15 0.9813 @30.0** ·
@@ -226,6 +226,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 
 - 00:00 exp09 code: wide blocking + stage-1 filter; mini end-to-end smoke (30k train S1 / 10k test S1) passed.
 - 00:15 `runs/night_chain.sh` started: waits for exp08's crowded blocking cache → stops exp08 → exp09 → crowd_eval.
+- 00:22 stage-1 trained on 60k held-out train S1: wide union 70.8 cand/S1, recall 0.9864.
+- 00:58 train blocking + stage-1: India 60.8M -> 9.9M pairs (11.2/S1), US 94.9M -> 14.6M (11.0/S1).
+  **Recall after stage-1 on the 300k model sample: 0.9819 at ~11 cand/S1** (exp05: 0.9756 at 30/S1).
+- 01:04 **exp09 OOF 0.9795** (India 0.9763, US 0.9817) vs exp06 0.9771 → +0.0024. Params t1=0.70 t2=0.74 r=0.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
