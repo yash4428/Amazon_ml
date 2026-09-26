@@ -285,6 +285,17 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 06:45 **day2_best := day2_blend_13_14_15** — validator+sanity PASS, 11.9 cand/S1, empty 0.056
   (France 0.051 / 3.40 matches per row, India 0.059 / 3.33, US 0.055 / 3.45).
 
+### Day 2 morning analysis (26 Sep ~10:30)
+- exp13 OOF loss (0.0196): recall-only 0.0115 (40% blocking-caused), non-singleton empty 0.0039, has-FP 0.0027,
+  singleton-FP 0.0014. True pairs missed: blocking 52k (1.9%), **model 76k (2.7%)**; FP pairs 11k.
+- Model-missed true pairs: **64% are EMPTY-ADDRESS copies with an (almost) exact name** ("Enix LLC | (no address)"
+  p=0.10), 7% random-looking names at the S1's exact full address ("Korzeta | 120 Franklin St"), 25% similar but
+  rejected (house-number noise), 2% native script, 2% domains. 97% of these S1s still get ≥1 correct prediction.
+- Cause: candidate-side competition used only blocking cosines, which ignore names when the address is empty.
+- **exp16** (launched 11:06) = exp13 setup (crowd 0.5, seed+3, 800k S1 → identical OOF sample) + candidate-side
+  context on name token-set / compact-name ratio / address token-set for ALL candidate pairs, + exact-address
+  duplicate counts (s1_addr_dup, cand_addr_dup). Compare directly with exp13 OOF 0.9804.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
