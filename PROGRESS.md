@@ -346,6 +346,19 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - exp18 (exp17 feats, seed+4) OOF 0.9812 (vs exp14 0.9800 same sample). Blend 17+18 on 290k common S1: 0.98151
   (old 13+14 blend on same S1: 0.98040).
 
+- 14:30 exp19 (exp17 feats, seed+5) OOF 0.9814. **Blend exp17/18/19 on the same 105,677 common S1 as the old
+  13/14/15 blend: 0.98145 vs 0.98041 (+0.0010)**. Packaged `submissions/day2_blend_17_18_19` (fallback final).
+- **14:31 ADVERSARIAL VALIDATION (dev/adversarial.py)** — classifier separating train pairs from test pairs:
+  * **France AUC 0.998**. Top shifted: ctx_ad_ts_sim_n_close 4.0→7.5, **xtok_sum 2.14→0.36, xtok_max 1.67→0.36**,
+    ctx_n_cand_s1 13.9→17.5, addr_tsort 57→70, n_cand_house_eq_s1 3.5→4.7.
+    ⇒ the LEARNED branch-word encoding (our #2 feature) is BLIND in France: French branch words (Participations,
+    Développement…) never occur in train labels → xtok≈0 → model reads "no branch word" → accepts French fake
+    branches. The unseen-country simulator missed this because US and India share ENGLISH branch words.
+  * **US AUC 0.904**: s1_name_dup 35→19, cand_name_dup 34→16, ctx_*_n_s1_for_cand 46→38 — size-dependent counts
+    (US test has half the S1 of US train). India AUC 0.884 (sizes similar; smaller shifts).
+- 14:36 **exp20** launched = exp17 − xtok_* (rely on label-free hmis) + clip size-dependent counts at 10
+  (name/addr dup counts, n_s1_for_cand). Same sample (seed+3, 800k S1).
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
