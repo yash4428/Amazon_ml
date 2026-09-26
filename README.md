@@ -1,3 +1,6 @@
+> **Team repo — start with `CLAUDE.md` §0 (handover) and `PROGRESS.md` (full record).** The problem statement below is the
+> official one. Code: `code/business_entity_resolution/`. The dataset is not in git (unzip the official resource here).
+
 # ML Challenge 2026 Problem Statement
 
 ## Business Entity Resolution Challenge

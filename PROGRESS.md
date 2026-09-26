@@ -3,33 +3,41 @@
 **Single source of truth for the team.** It records the current state, every finding (including dead ends), exact
 numbers, how to reproduce every submitted file and what to do next. Read it top to bottom before changing code.
 Rulebooks: `CLAUDE.md` (hard rules, metric, pipeline spec) and `START_HERE.md` (operating plan).
-Last full rewrite: **26 Sep 2026, ~17:40 IST** (end of Day 2 work block).
+Last full rewrite: 26 Sep 2026 ~17:40 IST; §0/§1/§4/§6c/§8-§10/§12/§13 updated **27 Sep 00:40 IST**.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 0. TL;DR — where we are
+## 0. TL;DR — where we are (updated 27 Sep 00:40 IST)
 
 | item | value |
 |---|---|
-| **Best public score** | **0.970385** — `submissions/day2_final_v2` (3-seed blend + robust France house rule + US shift rule) |
-| Pending upload | `submissions/day2_final_v2` (blend + robust house rule + US shift); running: exp22 (reverse blocking), exp23 (+crowd 0.9) — §6c |
-| Leaderboard (26 Sep evening) | leader > 0.99, top-100 ≈ 0.985+, we are ~600th |
-| Honest local score (best model) | exp21 OOF 0.9817; exp17 OOF 0.98146 (same 800k-S1 sample) |
-| Public decomposition (exact, from probes) | **US+India ≈ 0.9745** (85% of S1) · **France ≈ 0.938** (15% of S1) |
-| Deadline | leaderboard closes **27 Sep 23:59 IST**; package (zip) ready by **27 Sep 18:00 IST** |
+| **Best public score** | **0.970385** — `submissions/day2_final_v2` (3-seed blend exp17/18/19 + robust France house rule + US shift rule) |
+| **Upload next (day 3, slot 1)** | `submissions/day3_exp22_rules/matching_results.tsv` = **exp22** (reverse top-5 blocking, OOF **0.9833** vs 0.9815) + same rules. Expected ≈0.972-0.973 |
+| Running (chained, local machine) | exp23 = exp22 + crowd 0.9 (started 00:20, ETA ~02:30) → exp22 seeds 4, 5 (`runs/exp22s4_test`, `exp22s5_test`, ETA ~04:30) |
+| Leaderboard (27 Sep 00:00) | leader 0.9907, top-100 ≈ 0.985-0.986; we are ~600th |
+| Honest local score (best model) | **exp22 OOF 0.9833** (India 0.9813, US 0.9846); exp17 0.98146 (same 800k-S1 sample, seed 3) |
+| Public decomposition (exact, from probes) | Aprime: **US+India ≈ 0.9735, France ≈ 0.942** (singleton rate 0.0558 in every train country); C: US+IN ≈ 0.975 |
+| Deadline | leaderboard closes **27 Sep 23:59 IST**; package (zip) ready by **27 Sep 18:00 IST** (`METHODOLOGY.md` = filled template draft) |
 
-**The one-paragraph story.** Blocking + a LightGBM pair model + tuned decision rule gets ~0.98 locally. Every
-submission scored ~0.013 below its local estimate. Probes (§5.4) located the loss: France was ~0.88→0.94 and
-US/India ~0.97. EDA + adversarial validation traced both to **fake branches** (a *different* business with the S1's
-name and a *shifted house number*) being accepted as copies: in France because our learned branch-word feature only
-knows English/Indian branch words and French copies never carry house-number noise; in the US because test accepts
-2.7× more "same street, number ±1..30" pairs than train. A simple, data-driven rule for France gave +0.003 public.
-The US analogue (submission C) is waiting to be scored.
+**The story so far.** Blocking + a LightGBM pair model + tuned decision rule gets ~0.98 locally, but every upload
+scored 0.011-0.019 below local. Probes located the loss (France ≈0.94, US+India ≈0.975). Fake branches (a different
+business with the S1's name and a shifted house number) explained part of it. Two label-free rules gave +0.0014 each:
+the France house rule (French copies keep their house number) and the US shift rule (test has 4× the train rate of
+"same street, number ±1..30" look-alikes). On 26 Sep night a **loss decomposition** (§6c) showed that 60% of our
+local loss is RECALL (S1 with correct but incomplete match lists). Blocking alone lost 52k true pairs, 60% of them S1
+whose name is shared by ≥3 S1, so their top-60 list floods with look-alikes. **Reverse top-K blocking** (each pool
+record also keeps its 5 closest S1) fixed 30% of those misses: exp22 OOF 0.9815 → 0.9833 with 15% fewer candidates.
+Test also has ≈1.9× the distractors per S1 of train (crowd 0.5 only simulates 1.5×) → exp23 trains at crowd 0.9.
 
-**Start here tomorrow (Day 3):**
-1. Upload `submissions/day2_C_us_shift/matching_results.tsv` if not done; record the score. Decision rule in §9.
-2. Build the final file = best of {Aprime, C} (+ the India version of the rule if C wins) — §10.1.
-3. Package by 18:00 IST (§11). Everything must be reproducible from code (`run_pipeline.py` + `postprocess.py`).
+**Day 3 plan (5 uploads).** Every upload must teach something AND be a candidate final:
+1. `day3_exp22_rules` — public effect of reverse blocking vs C (0.970125 = same rules on exp17).
+   ≥0.972 → exp22 is the new base. ≤0.9705 → build exp22 US+IN + day2_final_v2 France rows to separate countries.
+2. `day3_exp23_rules` (after exp23 finishes: `postprocess.py --run runs/exp23_test --out submissions/day3_exp23_rules
+   --house-rule --shift-rule US`) — public effect of test-like density (compare with slot 1).
+3. Blend of the winner's seeds (exp22 + exp22s4 + exp22s5, or exp23 seeds if exp23 wins — then queue
+   `--sample-seed 4/5` runs of exp23 in the morning, ~55 min each with blocking caches) via `dev/blend.py`
+   (writes `test_scores.parquet` + params) → `postprocess.py --run <blend> --params <params.json> --house-rule --shift-rule US`.
+4-5. Final + one spare (e.g. `--shift-keep-only` variant or a France-only probe). Package by 18:00 (§11).
 
 ---------------------------------------------------------------------------------------------------------------
 
@@ -52,6 +60,14 @@ The US analogue (submission C) is waiting to be scored.
 python3 utils/validate_submission.py --matching output/matching_results.tsv --candidate output/candidate_pairs.tsv --test-dir dataset/test
 .venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir output --test-dir dataset/test
 ```
+
+**Current best model (exp22) and the upload file for day 3 slot 1:**
+`run_pipeline.py --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp22_test --crowd 0.5 --sample-seed 3
+--model-s1 800000 --profile exp17 --rev-k 5` (~2h25 cold: reverse blocking train 18 min + test 12 min extra) then
+`postprocess.py --run runs/exp22_test --out submissions/day3_exp22_rules --house-rule --shift-rule US`.
+`--rev-k K` = reverse top-K blocking (0 = off, the default in config). Blocking caches: `cache/blocks/rev_train_*`,
+`rev_test_*` (reverse), `train_*`/`test_*` (forward + stage-1; the key includes rk and the stage-1 CONFIG but not the
+stage-1 MODEL, so a second run with the same settings reuses the first run's pruned test candidates).
 
 **Reproducing the public-0.969 file (Aprime):**
 `run_pipeline.py ... --out-dir runs/exp17_test --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17`
@@ -136,7 +152,10 @@ breaks 58% of answerable ties with 78% accuracy; the S1's other copies do NOT he
    or a 6-digit PIN that is not the first number (the old rule threw away 5-digit US house numbers: 8.9% of US S1).
 2. **blocking.py** — per country, sparse IDF-cosine top-K (chunked matmul in processes, per-row argpartition).
    Current: `combo_c` (name char-4-grams + address uni/bigrams) K=60 + `combo` (name + address words) K=30,
-   max_df 20000; per-country post-hook.
+   max_df 20000; per-country post-hook. **Reverse top-K** (`reverse_candidates`, `--rev-k 5`, exp22): for every pool
+   record its 5 most similar S1 per generator, computed against ALL S1 of the country, added before stage-1; a
+   reverse-only pair gets its true cosine as `<g>_sim` and features `<g>_rev_rank` (99 = not in reverse top-K).
+   Stage-1 training re-indexes the full-S1 reverse pairs to its 60k held-out S1 (`fit_stage1(..., rev)`).
 3. **stage1.py** — cheap LightGBM (blocking sims/ranks, 3 rapidfuzz scores, house agreement, per-S1 gaps) trained on
    held-out train S1; keeps p ≥ 0.001, ≤ 20 per S1 → **~12 candidates per S1** (France 16.7). This is the set scored
    by the model and written to candidate_pairs.tsv (organiser email: smaller candidate sets rank higher).
@@ -315,6 +334,7 @@ no_cand_ctx 0.9570, no_len 0.9626 (length feats removed).
 | 2/3 | day2_Aprime | exp17 − French house-diff pairs | **0.969** | **France 0.938** |
 | 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | **0.970125** | US +0.0036 (Aprime 0.968745) |
 | 2/5 | day2_final_v2 | 3-seed blend 17/18/19 + robust France house rule + US shift rule | **0.970385** | +0.00026 vs C: blend + France fix transfer, small |
+| 3/1 | day3_exp22_rules | exp22 (reverse top-5 blocking) + robust house rule + US shift | *to upload* | reverse-blocking effect vs C |
 
 Built but not submitted: day2_exp17 (exp17 alone), day2_A_exp17usin_exp20fr, day2_blend_17_18_19, day2_exp13,
 day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide, day2_final, day2_probe_france.
@@ -322,28 +342,36 @@ day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wi
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 9. Reading the day2_C result
+## 9. Reading the day-2 results (done) and what they mean
 
-C keeps India/France rows identical to Aprime, so **C − 0.969 = exact US effect** of removing US accepted pairs whose
-house number is shifted by 1-30 on the same street (64,911 pairs, 9.8 per 100 US S1; 2,562 US S1 become empty).
-- C ≈ 0.972-0.974 → those were mostly fake branches. Next: test the same rule for India (keep US/France = C).
-- C ≈ 0.967-0.968 → they were mostly true copies with house noise; revert to Aprime and look elsewhere for the US loss.
+- **C (0.970125) − Aprime (0.968745) = +0.00138 overall = +0.0036 on US** (US = 38.3% of S1): the US shifted-number
+  pairs were mostly fake branches, but only half of the +0.003 we expected → some were true copies with house noise.
+  India version of the rule NOT tried: in India test the excess is only ≈1 per 100 S1 and train P(true) of such pairs
+  is 0.91 → expected negative.
+- **day2_final_v2 (0.970385) − C = +0.00026**: 3-seed blend (+0.0003-0.0004 on OOF) + robust France house rule
+  (+1,613 French pairs, expected +0.0001) both transfer with the right sign, but small. Seed blending is worth doing for
+  the final only if compute allows.
+- Public vs local: exp17 OOF 0.98146 → C public 0.970125. The gap (0.011) = France (≈0.94, 15% of S1 → 0.006) +
+  US+IN (≈0.975 vs 0.981 → 0.005), the latter consistent with test's doubled distractor density.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 10. Next steps (ranked)
+## 10. Next steps (ranked, 27 Sep)
 
-1. **Final file**: best of {Aprime, C}; if C wins, try `--shift-rule US India` as one more measured step. Consider
-   applying the rules to the exp21 run (5-digit fix) only if measured (keep other countries identical when testing).
-2. **Make the rules model-side** (for the package and for generality): train with realistic S1-derived fake branches
-   (`--s1-branches 0.5`, coded in `features.add_s1_branches`, not yet run; needs new crowded blocking, ~100 min) and
-   check on test that French house-diff / US shift acceptances fall without the post-rules.
-3. France is still ~0.94 vs ~0.975: remaining French errors are not visible label-free; candidates: French same-address
-   swapped-word pairs (are they copies or co-located businesses? an exact France-only experiment can tell), French
-   random-name / acronym records at shared addresses.
-4. Empty-address ties are ~0.004 of local loss and largely unresolvable — low priority.
-5. **Do NOT**: tune on the public LB beyond measured, hypothesis-driven steps; hand-label test; pseudo-label test
-   without asking the organisers (rule 7); add models/dependencies without asking Yash.
+1. Upload `day3_exp22_rules`; if it wins, exp22 (or exp23) is the base of the final (see the §0 day-3 plan).
+2. exp23 (crowd 0.9) → `day3_exp23_rules`. Its OOF is on a denser pool and is NOT comparable with exp22's OOF; only
+   the public score decides. If exp23 wins, run `--sample-seed 4` / `5` of exp23 for the blend.
+3. Remaining recall levers (measured on exp22 OOF, `dev/eda_loss_decomp.py runs/exp22_test`): still 36.2k true pairs
+   lost at blocking/stage-1 (22.7k non-empty address), 24.8k non-empty model misses, 49.3k empty-address misses
+   (mostly unresolvable name ties). Ideas: reverse top-10 (rank <10 covers 42% vs 34% for <5 of the misses that are not
+   in forward top-K), a looser stage-1 (23% of blocking-category misses were in forward top-K and cut by stage-1),
+   an exact-address key generator for made-up names at the exact address.
+4. France (≈0.94) is the biggest per-country hole; label-free checks found nothing big left in precision (§6c).
+   Reverse blocking changes 13% of French rows (+27.5k / −10.5k pairs) — the day3 slot-1 result tells whether that
+   helps France; to isolate France, combine exp22 US+IN rows with day2_final_v2 France rows (exact attribution, §5.4).
+5. Make the rules model-side (`--s1-branches`) — only if time allows; the post-rules are documented and data-driven.
+6. **Do NOT**: tune on the public LB beyond measured, hypothesis-driven steps; hand-label test; pseudo-label test
+   without asking the organisers (rule 7); add models/dependencies without asking Yash; run two pipelines at once.
 
 ---------------------------------------------------------------------------------------------------------------
 
@@ -369,7 +397,12 @@ house number is shifted by 1-30 on the same street (64,911 pairs, 9.8 per 100 US
   `crowd_eval.py`, `adversarial.py`, `blend.py`, `blend3_eval.py`, `expf.py`, `package.sh`, and the EDA scripts
   `eda_types.py` (record types & recall), `eda_empty.py` (empty-address ties), `eda_house.py` (house-number relations),
   `eda_acronym.py`, `eda_france.py`, `eda_rejected.py`, `eda_sibling.py`, `eda_accepted.py`,
-  `eda_branch_cluster.py`, `eda_street_number.py`.
+  `eda_branch_cluster.py`, `eda_street_number.py`, blind EDA `eda_fingerprint.py`, `eda_blind2.py`, `eda_shifted.py`,
+  `eda_shift_only.py`, `eda_exact_addr.py`, `eda_fr_exact.py`, `eda_block_miss.py`, `eda_plan_checks.py`; 26 Sep night (§6c):
+  `eda_loss_decomp.py [runs/X]` (OOF loss by error type, FN/FP causes), `eda_fn_look.py` (gain if each FN type were
+  recovered + examples), `eda_reverse_rank.py` (forward/reverse rank of blocking misses), `eda_empty_owner.py`,
+  `eda_empty_fn.py` (empty-address ties), `eda_slices.py` (FN/FP by name/address/house slice), `eda_fr_added.py`,
+  `eda_fr_branchwords.py`, `eda_fr_rejected.py`, `eda_orphans.py` (pool records nobody retrieves). Outputs go to `runs/eda/`.
 - `runs/<exp>_test/` (local only) — outputs + report per run; `runs/*.log` — run logs; `submissions/<name>/` — files +
   NOTE.md; `reports/` — early evaluate.py dumps; `experiments.csv` — evaluate.py log (val-split era).
 
@@ -388,5 +421,9 @@ house number is shifted by 1-30 on the same street (64,911 pairs, 9.8 per 100 US
   higher** beyond the LB → keep the stage-1 filter (~12/S1).
 - zsh does not word-split `$var` (a loop once created a split named "val --mode random --seed 42").
 - Read TSVs only with `io_utils.read_tsv` (tab, dtype=str, keep_default_na=False, QUOTE_NONE).
-- Git commits use `-c user.name="Yash Aggarwal" -c user.email=...`; tags `sub-day1-N`. The GitHub repo
-  `yash4428/Amazon_ml` is PUBLIC — do not push the dataset; consider making it private during the contest.
+- Git: tags `sub-day1-N`. GitHub: `https://github.com/yash4428/Amazon_ml` (pushed 27 Sep 00:45; PUBLIC until Yash
+  makes it private). The dataset, `runs/`, `cache/`, all TSVs (incl. the early `reports/*.tsv` error dumps, removed
+  from history because they exceed GitHub's 100 MB limit and contain training records) are NOT in git: get
+  `dataset/` from the official student_resource zip; regenerate runs locally.
+- Background chains: `runs/chain_exp23.sh`, `runs/chain_exp22_seeds.sh` (wait for the previous job, then run).
+  Check with `pgrep -fl run_pipeline` and `tail runs/<exp>_test.log`.

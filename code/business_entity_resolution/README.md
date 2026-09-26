@@ -12,7 +12,20 @@ python3.12 -m venv .venv
 
 ## Reproduce the submission (run from `student_resource/`)
 
-Best public file so far (0.969) = model **exp17** + the data-driven France house-number rule:
+Current best model (**exp22**, OOF 0.9833) = exp17 settings + reverse top-5 blocking, then the post-rules:
+
+```bash
+.venv/bin/python code/business_entity_resolution/src/run_pipeline.py \
+    --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp22_test \
+    --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17 --rev-k 5      # ~2.5 h cold
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp22_test --out output \
+    --house-rule --shift-rule US
+```
+
+Seed blends: run the same command with `--sample-seed 4` / `5` (blocking caches are reused, ~1 h each), blend with
+`dev/blend.py`, then `postprocess.py --run <blend dir> --params <blend params json> --house-rule --shift-rule US`.
+
+Earlier public files (exp17 based; public 0.969 = exp17 + the data-driven France house-number rule):
 
 ```bash
 # 1) model run (~100 min cold, ~60 min with caches in cache/)
@@ -50,12 +63,12 @@ python3 evaluate.py score --split val --pred runs/val/matching_results.tsv --can
 | `config.py` | every threshold, K, seed and path |
 | `io_utils.py` | safe TSV I/O (tab separator, strings only, empty kept) and output writers |
 | `normalize.py` | name/address normalisation, Indic-script transliteration, parsed pieces (postcode, house numbers) |
-| `blocking.py` | per-country sparse IDF-cosine top-K candidate generation (wide: combo_c@60 + combo@30) |
+| `blocking.py` | per-country sparse IDF-cosine top-K candidate generation (wide: combo_c@60 + combo@30) + optional reverse top-K per pool record (`--rev-k`) |
 | `stage1.py` | cheap LightGBM filter after blocking: ~70 → ~12 candidates per S1 at higher recall; its output is `candidate_pairs.tsv` |
 | `features.py` | string, address, house-number/branch-signature, learned & unsupervised branch-word, name-duplicate, blocking and context (competition) features; `add_synthetic_branches` (train-time crowd augmentation) |
 | `model.py` | LightGBM, 5-fold GroupKFold by S1, OOF predictions |
 | `decide.py` | one-to-one assignment, t1/t2/r thresholds tuned for macro F0.5 |
-| `postprocess.py` | data-driven fake-branch rules on saved test scores (France house rule, optional shift rule) |
+| `postprocess.py` | data-driven fake-branch rules on saved test scores (France house rule with street-number check, US shift rule) |
 | `run_pipeline.py` | CLI entry point |
 | `sanity_check.py` | submission checks (row counts, per-country empty rate, matches ⊆ candidates) |
 

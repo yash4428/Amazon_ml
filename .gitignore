@@ -13,3 +13,6 @@ models_cache/
 output/*.tsv
 
 submissions/*/*.tsv
+
+# early evaluate.py error dumps (contain training records; >100 MB)
+reports/*.tsv

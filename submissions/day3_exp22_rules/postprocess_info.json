@@ -1,0 +1,14 @@
+{
+  "run": "runs/exp22_test",
+  "params": [
+    0.72,
+    0.74,
+    0.0
+  ],
+  "house_rule": true,
+  "shift_rule": [
+    "US"
+  ],
+  "shift_keep_only": false,
+  "dropped": 116690
+}

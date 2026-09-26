@@ -8,6 +8,75 @@ You are the engineer on Yash's team for the Amazon ML Challenge 2026. Read this 
 
 ---
 
+## 0. HANDOVER — CURRENT STATE (updated 27 Sep 2026, 00:45 IST). READ THIS FIRST.
+
+The rest of this file is the ORIGINAL plan (written before any code). Where it differs from this section, **this
+section wins**. The full, detailed record (every finding, number, experiment, submission and gotcha) is
+**`PROGRESS.md`** — read §0, §5, §6c, §8-§11 before doing anything. `METHODOLOGY.md` is the filled documentation
+template (draft, final numbers TBD). `CONTEXT_FOR_CLAUDE_CHAT.md` (in git history, commit 3731378) is a standalone
+brief written for brainstorming in a chat.
+
+### 0.1 Where we are
+- **Best public score: 0.970385** (`submissions/day2_final_v2`). Leaderboard: leader 0.9907, top-100 ≈ 0.985, we are
+  ~600th. History: 0.679 → 0.955 → 0.963 → 0.964 → 0.966 → 0.968745 → 0.970125 → 0.970385.
+- **Best local model: exp22** — honest OOF macro-F0.5 **0.9833** on the full train set (India 0.9813, US 0.9846);
+  previous exp17 0.98146. exp22 = exp17 settings + **reverse top-5 blocking** (`--rev-k 5`).
+- **Next upload (day 3 slot 1): `submissions/day3_exp22_rules/matching_results.tsv`** (validator + sanity PASS),
+  expected ≈0.972-0.973. Compare with day2_C (0.970125, same rules on exp17) → public effect of reverse blocking.
+- **Running on Yash's Mac (chained):** exp23 = exp22 + crowd 0.9 (ETA ~02:30) → exp22 seeds 4 and 5 (ETA ~04:30).
+  Check: `pgrep -fl run_pipeline`; `tail runs/exp23_test.log`. Package: `postprocess.py --run runs/exp23_test --out
+  submissions/day3_exp23_rules --house-rule --shift-rule US` + validator + `sanity_check.py`.
+- **Deadline:** leaderboard closes 27 Sep 23:59 IST; zip (code + output + methodology) ready by 18:00 IST.
+
+### 0.2 How the pipeline works now (code/business_entity_resolution/src)
+normalize (multi-country dictionaries, Indic transliteration, learned translit dict) → **blocking per country**:
+sparse IDF-cosine top-K per S1 (`combo_c`@60 name-char-4grams+address words, `combo`@30 name+address words) **plus
+reverse top-5 per pool record** → **stage-1 LightGBM filter** (≈10-13 candidates per S1; this set IS
+`candidate_pairs.tsv`) → ~100 pair features (strings, house-number digit relations, branch signature, learned and
+label-free branch words, **candidate-side competition features** = the top features) → **LightGBM**, 5-fold GroupKFold
+by S1 on 800k train S1 with the train pool **crowded** by synthetic fake branches (`--crowd`) → decision: greedy
+one-to-one + (t1, t2, r) tuned on OOF macro-F0.5 → **post-rules** (`postprocess.py`): France house rule (label-free
+switch: applied where accepted digit-drop pairs < 3 per 100 S1 → France only; drops accepted pairs whose street number
+differs) and US shift rule (drops US accepted pairs with the house number shifted by 1-30 on the same street).
+Commands: `PROGRESS.md` §1. Best-model command:
+`run_pipeline.py --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp22_test --crowd 0.5
+--sample-seed 3 --model-s1 800000 --profile exp17 --rev-k 5` (~2.5 h cold on 12 cores / 24 GB), then
+`postprocess.py --run runs/exp22_test --out <dir> --house-rule --shift-rule US`.
+
+### 0.3 Things we learned that override the original plan
+1. **Do NOT trust `evaluate.py make-split` val scores** (random split puts most fake branches on the train side →
+   optimistic: rule baseline val 0.773 vs public 0.679). **Honest metric = OOF macro-F0.5 on the full train set**;
+   compare models on the same `--sample-seed`/`--model-s1`. OOF of runs with different `--crowd` is NOT comparable.
+2. **Probes + exact attribution** are our main public-LB tool: rows of different countries are independent, so change
+   one country at a time and compare with an already-scored file; France-empty probe P gives
+   US+IN = (P − 0.1498·0.0558)/0.8502, France = (S − P)/0.1498 + 0.0558. Current estimate: France ≈ 0.94, US+IN ≈ 0.975.
+3. **60% of the local loss is recall** (S1 with correct but incomplete lists); blocking lost 2% of true pairs, mostly
+   S1 with names shared by ≥3 S1 → reverse blocking. Empty-address copies whose name is shared by ≥2 S1 are coin flips
+   (calibrated, unresolvable).
+4. **Test ≠ train**: ≈1.9× distractors per S1; 4× more US "shifted house number" look-alikes; France unseen, with French
+   copies that never change the house number and very repetitive "<City> <Type> <LegalForm>" names.
+5. One-to-one is strict and all true pairs share the country → greedy one-to-one + hard country blocking are safe.
+6. Things that did NOT help: expected-F0.5 decoding, per-country thresholds for the unseen country, dropping xtok
+   (hurt France recall), India shift rule (not tried: expected negative), French acronym drop (they are true copies).
+7. No LLM / embedding reranker was built (no NVIDIA GPU; LightGBM features carried the work). `llm_rerank.py` does not
+   exist. Extra files vs §4 layout: `stage1.py`, `postprocess.py`, `sanity_check.py`, `dev/` analysis scripts.
+
+### 0.4 Day-3 plan (5 uploads) — see PROGRESS.md §0 and §10
+1. `day3_exp22_rules`. 2. `day3_exp23_rules` (density). 3. Seed blend of the winner (`dev/blend.py`, then
+`postprocess.py --params`). 4-5. Final + spare. Then package (PROGRESS.md §11): regenerate `output/` from code,
+validator, sanity, README commands, requirements, `METHODOLOGY.md` → `Documentation_template.md`, zip
+`<team_name>_submission.zip` (ask Yash for the team name). Record every public score in `submissions/log.md` and
+PROGRESS.md §8. Commit after every step.
+
+### 0.5 Working rules for teammates
+- Never run two full pipelines at once (12-15 GB each on 24 GB). Blocking results are cached in `cache/blocks/`.
+- `dataset/`, `runs/`, `cache/`, all TSVs are not in git: unzip the official student_resource into this folder and
+  regenerate runs. The GitHub repo is public until Yash makes it private — never commit data.
+- Yash uploads submissions himself; always give him the exact file path, the expected score and what the score will
+  tell us. Every upload must be validated (`utils/validate_submission.py`) and sanity-checked first.
+
+---
+
 ## 1. The problem in one paragraph
 
 There are three sources of business records, each with `entity_id`, `business_name`, `business_address` and `country`. Source 1 (S1) is a **deduplicated** reference list. For **every S1 record**, output every Source 2 / Source 3 record that is the same real-world business. That can be zero, one or many. The data is noisy: abbreviations (Pvt/Private, Ltd/Limited, Corp/Corporation, Rd/Road, St/Street), legal-suffix differences, DBA/trade names, & vs "and", word-order swaps, typos, transliterations, missing PIN/ZIP/state, landmark addresses ("Near SBI ATM"), municipal numbering formats and reordered address components. Sources 2 and 3 are **not** deduplicated, so one S1 record can own several S2 records.
