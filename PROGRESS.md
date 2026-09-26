@@ -216,6 +216,22 @@ blocking-score saturation (no cross-S1 ties), acronym density.
 
 ---------------------------------------------------------------------------------------------------------------
 
+## 6b. Blind EDA (26 Sep evening) — fresh look at the raw data (dev/eda_fingerprint.py, eda_blind2.py, eda_shifted.py)
+
+- **Shifted look-alikes** (same street, house number ±1..30, name token-set ≥90), per 100 S1, ALL candidates:
+  train US 8.72 (13% carry an extra word; P(true) ≈0.42) vs **test US 35.76 (4.1×; 22% extra word; model accepts
+  24.5% ≈ 8.8/100)**; train India 5.13 (P(true) ≈0.81) vs test India 10.25 (2×; accepted 48%); **test France 43.88**.
+  ⇒ test has many more fake branches that differ only by the house number, mostly WITHOUT a branch word. At the train
+  rate only ~3.6/100 US S1 are true shifted copies → ≈5 wrong merges per 100 US S1. This is the evidence behind
+  day2_C (expected ≈ +0.003 overall). India excess ≈1 wrong merge/100 S1 (marginal); France handled by the house rule.
+- **Record-format fingerprint** (owned-by-some-S1 vs distractor from the raw record only): AUC 0.78. Empty-address
+  records are ~97.7% owned by SOME S1 (4.5% of copies vs 0.3% of distractors); domain names similar (5% vs 0.6%);
+  distractors have longer names (4.0 vs 3.3 words — the appended branch word). Already captured by the model.
+- Exact duplicate pool records (0.9% of pool): 99.8% share their owner; OOF splits a twin pair only 6 times → nothing.
+- **Singletons are unpredictable from the S1 record** (AUC 0.500; singleton rate 0.056 for unique and shared names).
+- **No train/test overlap**: 0 identical S1 or pool records across splits (33.8% of test S1 names occur in train S1
+  names — generic names, different businesses).
+
 ## 7. Experiments (local = honest OOF on full train; "crowded" = train pool with synthetic branches)
 
 | tag | change | local OOF | IN / US | public |
