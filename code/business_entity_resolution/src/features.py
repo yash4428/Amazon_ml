@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from rapidfuzz import distance, fuzz, process
 
+import config
+
 
 W = -1  # rapidfuzz workers: all cores
 config_small_offset = 30  # |house number difference| counted as a "nudged" branch number
@@ -110,7 +112,9 @@ def context_features(c, score_col, cand_side=True):
         bestj = gj.transform("max").values
         out[f"{score_col}_rank_cand"] = gj.rank(ascending=False, method="min").values.astype(np.float32)
         out[f"{score_col}_gap_cand"] = (bestj - s).astype(np.float32)
-        out[f"{score_col}_n_s1_for_cand"] = gj.transform("size").values.astype(np.float32)
+        n_s1 = gj.transform("size").values.astype(np.float32)
+        clip = getattr(config, "COUNT_CLIP", None)
+        out[f"{score_col}_n_s1_for_cand"] = np.minimum(n_s1, clip) if clip else n_s1
     return pd.DataFrame(out, index=c.index)
 
 
@@ -313,6 +317,9 @@ def dup_features(c, s1, pool):
     if "adup_s1" in s1:
         out["s1_addr_dup"] = s1["adup_s1"].values[c["i"].values]
         out["cand_addr_dup"] = pool["adup_s1"].values[c["j"].values]
+    clip = getattr(config, "COUNT_CLIP", None)
+    if clip:  # "unique / shared by 2 / by 3" keep their meaning; the dataset-size-driven tail is removed
+        out = {k: np.minimum(v, clip) for k, v in out.items()}
     return pd.DataFrame(out, index=c.index)
 
 

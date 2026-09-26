@@ -31,7 +31,11 @@ USE_XTOK = True               # learned extra-name-token encoding feature
 RAW_NAMES = True              # raw-name pair features + raw-name competition (exp17)
 CTX_STRINGS = True            # candidate-side context on name/address string sims (exp16)
 USE_TRANSLIT_DICT = True      # learned Indic-transliteration -> English token map (train pairs)
-DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio"]  # country-specific (unseen-country sim +0.0018)
+DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio",  # country-specific (unseen-country sim +0.0018)
+                 # exp20: learned branch-word encoding is BLIND in France (adversarial validation: train mean
+                 # xtok_sum 2.14 vs France 0.36) -> rely on the label-free hmis detector instead
+                 "xtok_max", "xtok_sum", "xtok_unknown", "xtok_n"]
+COUNT_CLIP = 10               # exp20: cap dataset-size-dependent counts (US test has half the S1 of US train)
 NORM_VERSION = 2              # bump when normalisation changes (invalidates blocking cache)
 INFER_CHUNK_S1 = 250_000      # S1 records per feature/predict chunk at inference
 N_FOLDS = 5
