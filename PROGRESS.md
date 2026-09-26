@@ -11,8 +11,8 @@ Last full rewrite: **26 Sep 2026, ~17:40 IST** (end of Day 2 work block).
 
 | item | value |
 |---|---|
-| **Best public score** | **0.969** — `submissions/day2_Aprime` (exp17 + "France house-number rule") |
-| Pending upload | `submissions/day2_C_us_shift` (= Aprime + "US shifted-house-number rule"); C − 0.969 = exact US effect |
+| **Best public score** | **0.970125** — `submissions/day2_C_us_shift` (exp17 + France house rule + US shift rule) |
+| Pending upload | `submissions/day2_final_v2` (blend + robust house rule + US shift); running: exp22 (reverse blocking), exp23 (+crowd 0.9) — §6c |
 | Leaderboard (26 Sep evening) | leader > 0.99, top-100 ≈ 0.985+, we are ~600th |
 | Honest local score (best model) | exp21 OOF 0.9817; exp17 OOF 0.98146 (same 800k-S1 sample) |
 | Public decomposition (exact, from probes) | **US+India ≈ 0.9745** (85% of S1) · **France ≈ 0.938** (15% of S1) |
@@ -232,6 +232,46 @@ blocking-score saturation (no cross-S1 ties), acronym density.
 - **No train/test overlap**: 0 identical S1 or pool records across splits (33.8% of test S1 names occur in train S1
   names — generic names, different businesses).
 
+## 6c. Where the loss is (26 Sep night) — loss decomposition, test density, reverse blocking
+
+**OOF loss decomposition** (exp17, 800k S1, loss 0.0185 = 1 − 0.9815): S1 with correct matches but **missing
+copies 0.0112 (60%)** · non-singleton predicted empty 0.0038 · extra wrong matches 0.0019 · singleton given a match
+0.0012 · FP+FN 0.0004. → our weakness is **recall**, not precision. Missed true pairs (125k): blocking/stage-1
+51.9k (gain if all recovered +0.0065), model misses of empty-address copies 48.4k (+0.0056), other model misses
+25.1k (+0.0037).
+- **Empty-address copies are calibrated and mostly irreducible**: exact name_core shared by k S1 → P(true) 0.97 (k=1,
+  we accept 97.4%), 0.47 (k=2), 0.31 (k=3), 0.02 (k≥4); the model's mean score equals P(true) in every k bucket.
+- **Blocking misses**: 60% are S1 whose exact name is shared by ≥3 S1 (their top-60 list floods with look-alikes).
+  Of the 51.9k: 23% were in forward top-K and dropped by stage-1; of the rest, the S1 is in the pool record's own
+  **reverse** top-1/3/5/10 in 19%/29%/34%/42% of cases (8% share no blocking feature at all).
+  ⇒ **reverse top-K blocking** (`--rev-k 5`: each pool record also keeps its 5 most similar S1, per generator;
+  `blocking.reverse_candidates`, rev ranks become features `<g>_rev_rank`) — exp22.
+- Biggest model-miss slice: same name + same street + different house number (P(true) 0.455; model already
+  separates it: 2% of true missed, 0.4% of false accepted).
+- Train singleton rate is 0.0558 in BOTH US and India (generator constant) → the France decomposition holds:
+  Aprime France ≈ 0.942, US+IN ≈ 0.9735; C → US+IN ≈ 0.975.
+
+**Test density**: pool records per S1 — train 4.68 (US/IN), **test 5.76 US / 5.82 IN / 5.53 FR**. With 3.46 copies
+per S1, test has ≈2.3 distractors per S1 vs 1.22 in train (**≈1.9×**; crowd 0.5 only simulates 1.5×). The extra
+test records have the same max-similarity profile as ordinary train distractors (mostly combo_c 0.4-0.8), i.e. test ≈
+train with doubled distractors ⇒ **exp23 = exp22 + crowd 0.9**.
+- Label-free calibration check (sum of scores per S1 = 3.393 vs 3.396 true in OOF): test US 3.577, France 3.680,
+  India 3.421. Mid-score mass (0.5-0.9) per 100 S1: OOF 7.9, US 16.6, India 11.0, France 28.6. After C's rules the US
+  accepted-score histogram matches OOF closely; France has fewer top-bin (≥0.99) extras (209 vs 218 per 100 S1).
+- France: rejected same-number/same-street/similar-name candidates are only 1.36 per 100 French S1 (≤ +0.0002
+  overall even if all true). French names follow "<City> <Type> <Legal form>" ("Lille Fetes SARL"), very
+  repetitive; pool records selected by no S1: FR 0.38, IN 0.40, US 0.26 per S1 — some are clear true copies
+  ("Hospitalier Centre Saint JEAN | 63 Bd. Piere De…, Nantes" of S1 "Centre Hospitalier Saint Jean | 63 Boulevard
+  Pierre de Coubertin, Nantes") → reverse blocking.
+- French branch words (label-free: enrichment among shifted-number vs same-number accepted pairs): snc 378×,
+  participations 155×, groupe 13×, developpement 11×, sa 9×, center 9×, sasu/sas/sarl/sci/eurl 4-6×, france 3.6×;
+  noise suffixes on copies (ratio < 1): fils, et/and, compagnie, services, associes, dba/aka/formerly.
+  Same-number and no-number accepted pairs carry them at the same ~1% rate → nothing left to remove there.
+
+**Robust France house rule** (`postprocess.py`, now default): the house rule no longer drops pairs whose *street*
+number (number right before a street word) is equal although the first parsed numbers differ (postcode / appt /
+reordering artefacts): 1,613-1,623 French pairs restored.
+
 ## 7. Experiments (local = honest OOF on full train; "crowded" = train pool with synthetic branches)
 
 | tag | change | local OOF | IN / US | public |
@@ -270,7 +310,8 @@ no_cand_ctx 0.9570, no_len 0.9626 (length feats removed).
 | 2/1 | day2_best | blend exp13/14/15 | 0.966 | |
 | 2/2 | day2_exp17_probe_france | exp17, France emptied | 0.836 | **US+IN 0.9745** |
 | 2/3 | day2_Aprime | exp17 − French house-diff pairs | **0.969** | **France 0.938** |
-| 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | *pending* | C − 0.969 = US effect |
+| 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | **0.970125** | US +0.0036 (Aprime 0.968745) |
+| 2/5 | day2_final_v2 | 3-seed blend 17/18/19 + robust France house rule + US shift rule | *pending* | expected ≈0.9705 |
 
 Built but not submitted: day2_exp17 (exp17 alone), day2_A_exp17usin_exp20fr, day2_blend_17_18_19, day2_exp13,
 day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide, day2_final, day2_probe_france.

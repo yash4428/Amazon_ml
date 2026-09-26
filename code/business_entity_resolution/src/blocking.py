@@ -151,13 +151,58 @@ def topk_cosine(S, P, k, chunk=config.BLOCK_CHUNK, n_jobs=1):
     return tuple(np.concatenate([r[i] for r in res]) for i in range(4))
 
 
-def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose=True, post=None):
+def reverse_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose=True):
+    """Reverse top-K: for every POOL record, its ``rk`` most similar S1 records (per country, per generator
+    with ``rk`` > 0). Recovers true copies of S1 whose own top-K list is flooded by look-alikes (names shared
+    by many S1: 60% of blocking misses). Must be computed against ALL S1 of the country (competition matters).
+
+    Returns DataFrame i, j, ``<g>_rev_sim``, ``<g>_rev_rank`` (positions into the reset s1 / pool frames)."""
+    generators = generators or config.BLOCKING
+    s1 = s1.reset_index(drop=True)
+    pool = pool.reset_index(drop=True)
+    gens = {g: gc for g, gc in generators.items() if gc.get("rk", 0) > 0}
+    parts = []
+    for country in sorted(set(s1["country"])):
+        si = np.flatnonzero(s1["country"].values == country)
+        pj = np.flatnonzero(pool["country"].values == country)
+        if len(si) == 0 or len(pj) == 0 or not gens:
+            continue
+        per_gen = []
+        for g, gc in gens.items():
+            t0 = time.time()
+            analyzer, cols = SPACES[gc["space"]]
+            docs = list(zip(*[pd.concat([s1[c].iloc[si], pool[c].iloc[pj]]).tolist() for c in cols]))
+            S, P = build_matrix(docs, analyzer, gc["max_df"], len(si))
+            r, c, v, rk = topk_cosine(P, S, gc["rk"], n_jobs=n_jobs)      # rows = pool, cols = S1
+            per_gen.append(pd.DataFrame({"i": si[c], "j": pj[r], f"{g}_rev_sim": v,
+                                         f"{g}_rev_rank": rk.astype(np.int16)}))
+            if verbose:
+                print(f"  [{country}] reverse {g}: {len(pj)} pool x {len(si)} S1, top-{gc['rk']}, "
+                      f"{len(r)} pairs, {time.time() - t0:.1f}s", flush=True)
+        m = per_gen[0]
+        for d in per_gen[1:]:
+            m = m.merge(d, on=["i", "j"], how="outer")
+        parts.append(m)
+    if not parts:
+        return pd.DataFrame(columns=["i", "j"])
+    m = pd.concat(parts, ignore_index=True)
+    for g in gens:
+        m[f"{g}_rev_sim"] = m[f"{g}_rev_sim"].fillna(0).astype(np.float32)
+        m[f"{g}_rev_rank"] = m[f"{g}_rev_rank"].fillna(99).astype(np.int16)
+    m["i"] = m["i"].astype(np.int64)
+    m["j"] = m["j"].astype(np.int64)
+    return m
+
+
+def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose=True, post=None, rev=None):
     """Union of top-K candidates from every generator, blocked by country.
 
     Parameters
     ----------
     s1, pool : normalised frames (see normalize.normalize_frame), any index.
-    generators : dict name -> dict(space, k, max_df); default config.BLOCKING.
+    generators : dict name -> dict(space, k, max_df[, rk]); default config.BLOCKING.
+    rev : optional output of ``reverse_candidates`` (positions into these s1 / pool frames); its pairs are
+          added to the union before ``post`` and give ``<g>_rev_rank`` columns (99 = not in reverse top-K).
 
     Returns a DataFrame with integer positions ``i`` (row of s1) and ``j`` (row of
     pool) plus, per generator g, columns ``<g>_sim`` (cosine, 0 if not found) and
@@ -166,6 +211,7 @@ def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose
     generators = generators or config.BLOCKING
     s1 = s1.reset_index(drop=True)
     pool = pool.reset_index(drop=True)
+    rgens = [g for g, gc in generators.items() if gc.get("rk", 0) > 0] if rev is not None else []
     parts = []
     for country in sorted(set(s1["country"])):
         si = np.flatnonzero(s1["country"].values == country)
@@ -187,6 +233,16 @@ def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose
         m = per_gen[0]
         for d in per_gen[1:]:
             m = m.merge(d, on=["i", "j"], how="outer")
+        if rgens:
+            rv = rev[s1["country"].values[rev["i"].values] == country]
+            n0 = len(m)
+            m = m.merge(rv, on=["i", "j"], how="outer")
+            for g in rgens:       # a reverse-only pair still has its (symmetric) cosine
+                m[f"{g}_sim"] = m[f"{g}_sim"].fillna(m[f"{g}_rev_sim"])
+                m[f"{g}_rev_rank"] = m[f"{g}_rev_rank"].fillna(99).astype(np.int16)
+            m = m.drop(columns=[f"{g}_rev_sim" for g in rgens])
+            if verbose:
+                print(f"  [{country}] reverse top-K added {len(m) - n0} pairs", flush=True)
         for g in generators:
             m[f"{g}_sim"] = m[f"{g}_sim"].fillna(0).astype(np.float32)
             m[f"{g}_rank"] = m[f"{g}_rank"].fillna(99).astype(np.int16)
@@ -201,6 +257,8 @@ def generate_candidates(s1, pool, generators=None, n_jobs=config.N_JOBS, verbose
     for g in generators:
         cand[f"{g}_sim"] = cand[f"{g}_sim"].fillna(0).astype(np.float32)
         cand[f"{g}_rank"] = cand[f"{g}_rank"].fillna(99).astype(np.int16)
+    for g in rgens:
+        cand[f"{g}_rev_rank"] = cand[f"{g}_rev_rank"].fillna(99).astype(np.int16)
     cand["i"] = cand["i"].astype(np.int64)
     cand["j"] = cand["j"].astype(np.int64)
     return cand

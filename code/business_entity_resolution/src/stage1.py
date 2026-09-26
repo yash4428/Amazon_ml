@@ -25,6 +25,8 @@ def stage1_features(c, s1, pool):
     for g in [col[:-4] for col in c.columns if col.endswith("_sim")]:
         f[f"{g}_sim"] = c[f"{g}_sim"].values
         f[f"{g}_rank"] = c[f"{g}_rank"].values.astype(np.float32)
+    for col in [x for x in c.columns if x.endswith("_rev_rank")]:     # reverse top-K rank (pool -> S1)
+        f[col] = c[col].values.astype(np.float32)
     f["name_tset"] = process.cpdist(s1["name_core"].values[ii].tolist(), pool["name_core"].values[jj].tolist(),
                                     scorer=fuzz.token_set_ratio, workers=-1, dtype=np.float32)
     f["addr_tset"] = process.cpdist(s1["addr_norm"].values[ii].tolist(), pool["addr_norm"].values[jj].tolist(),

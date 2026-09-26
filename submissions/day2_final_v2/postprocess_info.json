@@ -1,0 +1,14 @@
+{
+  "run": "runs/blend_17_18_19",
+  "params": [
+    0.72,
+    0.72,
+    0.0
+  ],
+  "house_rule": true,
+  "shift_rule": [
+    "US"
+  ],
+  "shift_keep_only": false,
+  "dropped": 106719
+}

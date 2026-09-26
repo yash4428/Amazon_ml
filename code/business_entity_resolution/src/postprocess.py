@@ -28,6 +28,31 @@ from features import cluster_features  # noqa: E402
 from io_utils import write_outputs  # noqa: E402
 from normalize import load_normalized, reparse_numbers  # noqa: E402
 
+import re  # noqa: E402
+import unicodedata  # noqa: E402
+
+# Robust STREET number = the number directly before a street-type word (FR + EN). Used so the house rule does not
+# fire on parsing artefacts: postcode / apartment / "CS 71903" / reordered components before the street number
+# ("…, 44600 ST NAZAIRE, 34 rue Guy de Maupassant" vs "34 Rue Guy De Maupassant, 44600 …"). EDA 26 Sep: 1,627 of the
+# 39,575 French pairs dropped by the first-number rule have EQUAL street numbers (true copies); on kept pairs the
+# robust numbers agree 100% of the time.
+_STREET = (r"(?:rue|r|avenue|av|ave|bd|boulevard|blvd|boul|allee|all|chemin|ch|chem|cours|cour|crs|route|rte|"
+           r"impasse|imp|place|pl|quai|square|sq|esplanade|espl|faubourg|fg|passage|pass|voie|parvis|rond|mail|"
+           r"promenade|prom|sentier|villa|cite|hameau|lotissement|lot|residence|res|chaussee|montee|traverse|clos|"
+           r"domaine|street|st|road|rd|drive|dr|lane|ln|court|ct|way|highway|hwy|parkway|pkwy|circle|cir|terrace|"
+           r"trail|trl|plaza|pike|loop)")
+_STREET_NUM = re.compile(r"(?<![\d])(\d+)\s*(?:bis|ter|quater|[a-d])?\s*[,.-]?\s+" + _STREET + r"\b\.?")
+
+
+def street_number(addr):
+    """Number directly preceding a street-type word ('' if none)."""
+    a = unicodedata.normalize("NFKD", addr)
+    a = "".join(ch for ch in a if not unicodedata.combining(ch)).lower()
+    for ch in ("n°", "nº", "#", "(", ")"):
+        a = a.replace(ch, " ")
+    m = _STREET_NUM.search(a)
+    return (m.group(1).lstrip("0") or "0") if m else ""
+
 
 def main():
     """Load a run's test scores, apply the decision rule and the optional post-processing rules, write outputs."""
@@ -61,7 +86,14 @@ def main():
             print(f"  {c:8s} accepted digit-drop pairs per 100 S1 = {noise:6.2f} -> house rule "
                   f"{'APPLIED' if apply else 'not applied'}")
             if apply:
-                drop |= m & diff
+                cand = np.flatnonzero(m & diff)
+                a1 = s1["business_address"].values[pr["i"].values[cand]]
+                a2 = pool["business_address"].values[pr["j"].values[cand]]
+                sn1 = np.array([street_number(x) for x in a1]); sn2 = np.array([street_number(x) for x in a2])
+                artefact = (sn1 != "") & (sn1 == sn2)          # first numbers differ, street numbers agree
+                print(f"  {c:8s} house rule: {len(cand)} first-number mismatches, {int(artefact.sum())} kept "
+                      f"(equal street number = parsing artefact)")
+                drop[cand[~artefact]] = True
     for c in a.shift_rule:
         sh = (cty == c) & (cf["branch_sig"].values == 1)
         if a.shift_keep_only:

@@ -7,4 +7,5 @@
 | day1_5 | blend exp06+exp07 | OOF exp06 0.9771 | - | - | 0.964 |
 | day2_1 | day2_best (blend exp13/14/15) | OOF ~0.9804 | IN .9776 | US .9822 | 0.966 |
 | day2_2 | exp17 France probe | - | - | - | 0.836 (US+IN = 0.9745) |
-| day2_3 | Aprime = exp17 minus France house-diff pairs | - | - | - | **0.969** (France ≈ 0.938) |
+| day2_3 | Aprime = exp17 minus France house-diff pairs | - | - | - | **0.968745** (France ≈ 0.938) |
+| day2_4 | C = Aprime minus US shifted-number pairs | - | - | - | **0.970125** (US +0.0036) |

@@ -18,7 +18,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
-from blocking import generate_candidates  # noqa: E402
+from blocking import generate_candidates, reverse_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
 from features import (add_dup_counts, add_raw_names, add_s1_branches, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
                       dup_features, encode_extras, global_context, hmis_features,
@@ -34,8 +34,8 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def blocking_cached(s1, pool, tag, post=None, post_key=""):
-    """Run blocking (+ optional per-country stage-1 filter), cached by (record ids, config)."""
+def _block_path(s1, pool, tag, post_key=""):
+    """Cache path keyed by (record ids, blocking config, stage-1 config)."""
     h = hashlib.md5()
     h.update(post_key.encode())
     h.update(json.dumps(config.BLOCKING, sort_keys=True).encode())
@@ -43,11 +43,31 @@ def blocking_cached(s1, pool, tag, post=None, post_key=""):
     h.update(str(len(s1)).encode() + str(len(pool)).encode())
     h.update(",".join(s1["entity_id"].iloc[:: max(1, len(s1) // 1000)]).encode())
     h.update(",".join(pool["entity_id"].iloc[:: max(1, len(pool) // 1000)]).encode())
-    path = os.path.join(config.CACHE_DIR, "blocks", f"{tag}_{h.hexdigest()[:12]}.parquet")
+    return os.path.join(config.CACHE_DIR, "blocks", f"{tag}_{h.hexdigest()[:12]}.parquet")
+
+
+def reverse_cached(s1, pool, tag):
+    """Reverse top-K (pool -> ALL S1) candidates, cached; None when no generator has rk > 0."""
+    if not any(gc.get("rk", 0) > 0 for gc in config.BLOCKING.values()):
+        return None
+    path = _block_path(s1, pool, "rev_" + tag)
+    if os.path.exists(path):
+        log(f"reverse blocking cache hit {path}")
+        return pd.read_parquet(path)
+    rev = reverse_candidates(s1, pool)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    rev.to_parquet(path, index=False)
+    log(f"reverse blocking: {len(rev)} pairs")
+    return rev
+
+
+def blocking_cached(s1, pool, tag, post=None, post_key="", rev=None):
+    """Run blocking (+ optional reverse top-K pairs, + optional per-country stage-1 filter), cached."""
+    path = _block_path(s1, pool, tag, post_key)
     if os.path.exists(path):
         log(f"blocking cache hit {path}")
         return pd.read_parquet(path)
-    cand = generate_candidates(s1, pool, post=post)
+    cand = generate_candidates(s1, pool, post=post, rev=rev)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     cand.to_parquet(path, index=False)
     return cand
@@ -91,7 +111,7 @@ def stage1_key():
     return json.dumps(config.STAGE1, sort_keys=True) if config.STAGE1 else ""
 
 
-def fit_stage1(s1, pool, truth, model_pos):
+def fit_stage1(s1, pool, truth, model_pos, rev=None):
     """Train the stage-1 filter on train S1 that are NOT in the matching-model sample.
 
     Returns (model or None, post-hook for blocking, cache-key string).
@@ -103,7 +123,11 @@ def fit_stage1(s1, pool, truth, model_pos):
     idx = np.sort(rng.choice(rest, min(config.STAGE1["train_s1"], len(rest)), replace=False))
     s1_s = s1.iloc[idx].reset_index(drop=True)
     log(f"stage-1: blocking {len(s1_s)} held-out train S1 for filter training")
-    c = generate_candidates(s1_s, pool, verbose=False)
+    rev_s = None
+    if rev is not None:           # reverse ranks were computed against ALL train S1 -> keep the subset, re-index
+        rev_s = rev[np.isin(rev["i"].values, idx)].copy()
+        rev_s["i"] = np.searchsorted(idx, rev_s["i"].values)
+    c = generate_candidates(s1_s, pool, verbose=False, rev=rev_s)
     label_pairs(c, s1_s, pool, truth)
     F = stage1_features(c, s1_s, pool)
     model = train_stage1(F, c["y"].values.astype(np.int8))
@@ -138,9 +162,11 @@ def fit_lgbm(args, report_dir):
     rng = np.random.RandomState(config.SEED + args.sample_seed)
     n_model = min(args.model_s1, len(s1_tr))
     pos = np.sort(rng.choice(len(s1_tr), n_model, replace=False))
-    st1, post, post_key = fit_stage1(s1_tr, pool_tr, truth, pos)
+    rev_tr = reverse_cached(s1_tr, pool_tr, "train")
+    st1, post, post_key = fit_stage1(s1_tr, pool_tr, truth, pos, rev_tr)
     log(f"blocking train: {len(s1_tr)} S1 x {len(pool_tr)} pool")
-    cand = blocking_cached(s1_tr, pool_tr, "train", post=post, post_key=post_key)
+    cand = blocking_cached(s1_tr, pool_tr, "train", post=post, post_key=post_key, rev=rev_tr)
+    del rev_tr
     hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
     log(f"house-mismatch token rates: {len(hm_rates)} tokens")
     cand = pd.concat([cand, global_context(cand, *((s1_tr, pool_tr) if config.CTX_STRINGS else ()))], axis=1)
@@ -266,7 +292,12 @@ def main():
                     help="stop after OOF scoring on the train dir (no test inference)")
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
                     help="number of train S1 records used for tuning (full train pool is kept)")
+    ap.add_argument("--rev-k", type=int, default=0,
+                    help="reverse top-K blocking: also keep each pool record's K most similar S1 (per generator)")
     args = ap.parse_args()
+    if args.rev_k > 0:
+        for g in config.BLOCKING:
+            config.BLOCKING[g]["rk"] = args.rev_k
     if args.profile == "exp17":
         config.DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio"]
         config.COUNT_CLIP = None
@@ -297,7 +328,8 @@ def main():
     log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
     if args.mode == "lgbm" and st1 is not None:
         cand_te = blocking_cached(s1_te, pool_te, "test",
-                                  post=lambda m: prune(m, s1_te, pool_te, st1), post_key=stage1_key())
+                                  post=lambda m: prune(m, s1_te, pool_te, st1), post_key=stage1_key(),
+                                  rev=reverse_cached(s1_te, pool_te, "test"))
     else:
         cand_te = blocking_cached(s1_te, pool_te, "test")
     if args.mode == "lgbm":
