@@ -133,7 +133,8 @@ def fit_lgbm(args, report_dir):
     cand = blocking_cached(s1_tr, pool_tr, "train", post=post, post_key=post_key)
     hm_rates = house_mismatch_token_rates(cand, s1_tr, pool_tr)
     log(f"house-mismatch token rates: {len(hm_rates)} tokens")
-    cand = pd.concat([cand, global_context(cand)], axis=1)
+    cand = pd.concat([cand, global_context(cand, *((s1_tr, pool_tr) if config.CTX_STRINGS else ()))], axis=1)
+    log("global context features done")
     sub = cand[np.isin(cand["i"].values, pos)].copy()
     del cand
     n_true = label_pairs(sub, s1_tr, pool_tr, truth)
@@ -208,7 +209,7 @@ def predict_lgbm(cand, s1, pool, models, cols, tok):
     """Score test candidates chunk by chunk (whole S1 groups per chunk)."""
     hm_rates = house_mismatch_token_rates(cand, s1, pool)
     log(f"test house-mismatch token rates: {len(hm_rates)} tokens")
-    cand = pd.concat([cand, global_context(cand)], axis=1)
+    cand = pd.concat([cand, global_context(cand, *((s1, pool) if config.CTX_STRINGS else ()))], axis=1)
     cand = cand.sort_values("i", kind="stable").reset_index(drop=True)
     score = np.zeros(len(cand), np.float32)
     bounds = np.searchsorted(cand["i"].values, np.arange(0, len(s1) + config.INFER_CHUNK_S1,

@@ -107,10 +107,36 @@ def context_features(c, score_col, cand_side=True):
     return pd.DataFrame(out, index=c.index)
 
 
-def global_context(cand):
-    """Blocking-score context features over the FULL candidate set (all S1)."""
-    sims = [c for c in cand.columns if c.endswith("_sim")]
-    parts = [context_features(cand, c) for c in sims]
+def string_context_sims(cand, s1, pool, chunk=4_000_000):
+    """Name / compact-name / address similarities (0-1) for EVERY candidate pair (for context features).
+
+    Candidate lists are small after the stage-1 filter (~12 per S1), so this is cheap. It lets the
+    candidate-side context ask "does another S1 fit this record's NAME (or ADDRESS) better?", which the
+    blocking cosines cannot answer for empty-address or random-name copies.
+    """
+    out = {k: np.zeros(len(cand), np.float32) for k in ("nm_ts_sim", "cp_r_sim", "ad_ts_sim")}
+    ii, jj = cand["i"].values, cand["j"].values
+    for a in range(0, len(cand), chunk):
+        b = min(a + chunk, len(cand))
+        i, j = ii[a:b], jj[a:b]
+        out["nm_ts_sim"][a:b] = _pair(fuzz.token_set_ratio, s1["name_core"].values[i].tolist(),
+                                      pool["name_core"].values[j].tolist()) / 100
+        out["cp_r_sim"][a:b] = _pair(fuzz.ratio, s1["name_compact"].values[i].tolist(),
+                                     pool["name_compact"].values[j].tolist()) / 100
+        out["ad_ts_sim"][a:b] = _pair(fuzz.token_set_ratio, s1["addr_norm"].values[i].tolist(),
+                                      pool["addr_norm"].values[j].tolist()) / 100
+    return pd.DataFrame(out, index=cand.index)
+
+
+def global_context(cand, s1=None, pool=None):
+    """Context features over the FULL candidate set (all S1): blocking cosines and, when the
+    frames are given, name/address string similarities."""
+    base = cand
+    if s1 is not None and pool is not None:
+        base = pd.concat([cand[["i", "j"] + [c for c in cand.columns if c.endswith("_sim")]],
+                          string_context_sims(cand, s1, pool)], axis=1)
+    sims = [c for c in base.columns if c.endswith("_sim")]
+    parts = [context_features(base, c) for c in sims]
     out = pd.concat(parts, axis=1)
     out["n_cand_s1"] = cand.groupby("i")["j"].transform("size").values.astype(np.float32)
     return out.add_prefix("ctx_")
@@ -242,13 +268,24 @@ def add_dup_counts(s1, pool):
     s1 = s1.assign(dup_s1=key_s1.map(vc).values.astype(np.float32))
     key_p = pool["country"] + "|" + pool["name_core"]
     pool = pool.assign(dup_s1=key_p.map(vc).fillna(0).values.astype(np.float32))
+    # exact-address ambiguity: how many S1 records sit at this (normalised) address
+    ak_s1 = s1["country"] + "|" + s1["addr_norm"]
+    avc = ak_s1.value_counts()
+    s1 = s1.assign(adup_s1=ak_s1.map(avc).values.astype(np.float32))
+    ak_p = pool["country"] + "|" + pool["addr_norm"]
+    pool = pool.assign(adup_s1=np.where(pool["addr_norm"].values == "", -1,
+                                        ak_p.map(avc).fillna(0).values).astype(np.float32))
     return s1, pool
 
 
 def dup_features(c, s1, pool):
     """Per-pair name-ambiguity features from add_dup_counts columns."""
-    return pd.DataFrame({"s1_name_dup": s1["dup_s1"].values[c["i"].values],
-                         "cand_name_dup": pool["dup_s1"].values[c["j"].values]}, index=c.index)
+    out = {"s1_name_dup": s1["dup_s1"].values[c["i"].values],
+           "cand_name_dup": pool["dup_s1"].values[c["j"].values]}
+    if "adup_s1" in s1:
+        out["s1_addr_dup"] = s1["adup_s1"].values[c["i"].values]
+        out["cand_addr_dup"] = pool["adup_s1"].values[c["j"].values]
+    return pd.DataFrame(out, index=c.index)
 
 
 def house_mismatch_token_rates(cand, s1, pool, top=5, min_n=20):
