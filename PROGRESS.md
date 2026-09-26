@@ -245,7 +245,9 @@ copies 0.0112 (60%)** · non-singleton predicted empty 0.0038 · extra wrong mat
   Of the 51.9k: 23% were in forward top-K and dropped by stage-1; of the rest, the S1 is in the pool record's own
   **reverse** top-1/3/5/10 in 19%/29%/34%/42% of cases (8% share no blocking feature at all).
   ⇒ **reverse top-K blocking** (`--rev-k 5`: each pool record also keeps its 5 most similar S1, per generator;
-  `blocking.reverse_candidates`, rev ranks become features `<g>_rev_rank`) — exp22.
+  `blocking.reverse_candidates`, rev ranks become features `<g>_rev_rank`) — **exp22: raw blocking recall 0.9852→0.9905,
+  after stage-1 0.9813→0.9869 with 15% FEWER pairs (10.2 vs 12.0 cand/S1); OOF 0.98146→0.9833 (India +0.0025, US
+  +0.0013); blocking-lost true pairs 51.9k→36.2k; FP pairs 9.5k→9.8k.** Cost: +18 min train / +12 min test blocking.
 - Biggest model-miss slice: same name + same street + different house number (P(true) 0.455; model already
   separates it: 2% of true missed, 0.4% of false accepted).
 - Train singleton rate is 0.0558 in BOTH US and India (generator constant) → the France decomposition holds:
@@ -291,6 +293,7 @@ reordering artefacts): 1,613-1,623 French pairs restored.
 | exp18/19 | exp17 features, seeds 4/5 | 0.9812 / 0.9814 | – | blend 17/18/19 = 0.98145 (105k common S1) |
 | exp20 | exp17 − xtok, counts clipped at 10 | 0.9813 (seed 3) | .9787/.9831 | not submitted (France recall loss) |
 | exp21 | exp20 + 5-digit house-number parsing fix | **0.9817** (seed 3) | .9785/.9838 | – |
+| **exp22** | **exp17 + reverse top-5 blocking** (`--rev-k 5`, profile exp17, seed 3) | **0.9833** | **.9813/.9846** | pending |
 
 Other results: expected-F0.5 decision 0.9763 < tuned thresholds 0.9771 (rejected). Stricter thresholds for an
 unseen country: +0.002 US / 0 India (rejected). Unseen-country simulator: all 0.9608, no_xtok 0.9609, no_dup 0.9588,
