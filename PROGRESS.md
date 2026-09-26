@@ -9,7 +9,9 @@ changing anything. Rulebooks: `CLAUDE.md` (hard rules, metric, pipeline spec) an
 ## 0. TL;DR (updated 26 Sep 05:20 IST)
 
 - **Best public so far: 0.964** (day1_5). Leader 0.9884, top-15 ≈ 0.984, top-100 ≈ 0.97.
-- **Morning file (validated): `submissions/day2_best/matching_results.tsv`** = 0.7·exp13 + 0.3·blend(exp10,exp11,exp12).
+- **Morning file (validated): `submissions/day2_best/matching_results.tsv`** = 0.5·exp13 + 0.5·exp14
+  (two 800k-S1 crowd-trained models; common-OOF on 290k S1 = **0.98040**). Fallback: `submissions/day2_final`
+  (0.7·exp13 + 0.3·blend(10,11,12)); non-crowd alternative: `submissions/day2_exp09_wide`.
   All are LightGBM models with **wide blocking + stage-1 filter (11.9 cand/S1, was 29.5)** and **crowd training**
   (train pool augmented with 50% synthetic fake branches to match test density). exp13 alone: OOF 0.9804
   (IN .9776 US .9822) under crowded conditions (our previous best, exp06, was 0.9771 under easier normal conditions).
@@ -151,7 +153,8 @@ Caches (gitignored, safe to delete, rebuilt automatically): `cache/norm_s{1,2,3}
 | exp11 | exp10, seed+1, 400k S1 | 0.9794 (crowded) | IN .9761 US .9816 | – | |
 | exp12 | exp10, seed+2, 400k S1 | 0.9792 (crowded) | IN .9762 US .9812 | – | |
 | exp13 | exp10, seed+3, **800k S1** | **0.9804** (crowded) | IN .9776 US .9822 | – | best single |
-| blends | 10+11: 0.97935 (common 54k S1); 11+12: 0.98016 (72k); 13 alone ≥ 13-blends | | | | day2_best = .7·13 + .3·(10,11,12) |
+| exp14 | exp10, seed+4, 800k S1 | 0.9800 (crowded) | IN .9773 US .9819 | – | |
+| blends | 10+11: 0.97935 (common 54k S1); 11+12: 0.98016 (72k); **13+14: 0.98040 (290k)** | | | | day2_best = 0.5·13 + 0.5·14 |
 
 Blocking tables (30k train-part S1, with learned translit):
 - combo20+c4_10 0.9735 @26.6/S1 · combo_c20+combo10 0.9770 @22.5 · **combo_c25+combo15 0.9813 @30.0** ·
@@ -270,6 +273,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 05:16 **day2_best := 0.7·exp13 + 0.3·blend(10,11,12)**, params t1=.72 t2=.72 r=0 (exp13 OOF), validator+sanity
   PASS, 11.9 cand/S1, empty 0.056 (France 0.052, 3.39 matches/row). Also packaged: day2_exp13 (exp13 alone).
 - 05:17 exp14 launched (crowd 0.5, 800k S1, seed+4) → blend with exp13 if it helps on common OOF.
+- 05:46 exp14 (crowd 0.5, 800k S1, seed+4) OOF 0.9800 (IN .9773 US .9819).
+- 05:57 **blend exp13+exp14 on 290k common OOF S1: 0.98040** (singles 0.98014 / 0.98012; t1 .74 t2 .70 r 0).
+  Validator+sanity PASS → **day2_best := day2_blend_13_14**. Previous 0.7/0.3 version kept as day2_final.
+- 06:00 exp15 launched (crowd 0.5, 800k S1, seed+5) for a possible 3-way big-model blend.
 - (results appended below as they arrive)
 
 ---------------------------------------------------------------------------------------------------------------
