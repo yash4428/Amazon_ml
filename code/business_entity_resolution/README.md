@@ -12,16 +12,26 @@ python3.12 -m venv .venv
 
 ## Reproduce the submission (run from `student_resource/`)
 
+Best public file so far (0.969) = model **exp17** + the data-driven France house-number rule:
+
 ```bash
+# 1) model run (~100 min cold, ~60 min with caches in cache/)
 .venv/bin/python code/business_entity_resolution/src/run_pipeline.py \
-    --train-dir dataset/train --test-dir dataset/test --out-dir output --crowd 0.5 --model-s1 800000
+    --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp17_test \
+    --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17
+# 2) decision + post-processing rules on the saved scores (~3 min) -> output/
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp17_test --out output --house-rule
+#    (+ --shift-rule US for the day2_C variant)
+# 3) checks
 python3 utils/validate_submission.py --matching output/matching_results.tsv \
     --candidate output/candidate_pairs.tsv --test-dir dataset/test
 .venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir output --test-dir dataset/test
 ```
 
-This writes `output/matching_results.tsv`, `output/candidate_pairs.tsv` and `output/run_info.json`.
-Intermediate results are cached in `cache/` (normalised text, blocking candidates); delete it for a cold run.
+`--profile exp17` restores the exp17 settings (learned branch-word features kept, no count clipping, original postcode
+parser); without it `config.py` defaults (exp21 settings) are used. `postprocess.py` applies the house rule only to
+countries whose accepted true-copy-like pairs show no house-number noise (measured without labels: France 1.08
+digit-drop pairs per 100 S1 vs ~20-23 in US/India). Both rules only remove pairs, so matches ⊆ candidates.
 
 ## Validation
 
@@ -45,6 +55,7 @@ python3 evaluate.py score --split val --pred runs/val/matching_results.tsv --can
 | `features.py` | string, address, house-number/branch-signature, learned & unsupervised branch-word, name-duplicate, blocking and context (competition) features; `add_synthetic_branches` (train-time crowd augmentation) |
 | `model.py` | LightGBM, 5-fold GroupKFold by S1, OOF predictions |
 | `decide.py` | one-to-one assignment, t1/t2/r thresholds tuned for macro F0.5 |
+| `postprocess.py` | data-driven fake-branch rules on saved test scores (France house rule, optional shift rule) |
 | `run_pipeline.py` | CLI entry point |
 | `sanity_check.py` | submission checks (row counts, per-country empty rate, matches ⊆ candidates) |
 

@@ -1,425 +1,332 @@
 # PROGRESS / HANDOVER — Amazon ML Challenge 2026: Business Entity Resolution
 
-This file is the **single source of truth** for the team. It records the current state, everything we learned
-(including dead ends), exact numbers, how to run things and what to do next. Read it top to bottom before
-changing anything. Rulebooks: `CLAUDE.md` (hard rules, metric, pipeline spec) and `START_HERE.md` (operating plan).
+**Single source of truth for the team.** It records the current state, every finding (including dead ends), exact
+numbers, how to reproduce every submitted file and what to do next. Read it top to bottom before changing code.
+Rulebooks: `CLAUDE.md` (hard rules, metric, pipeline spec) and `START_HERE.md` (operating plan).
+Last full rewrite: **26 Sep 2026, ~17:40 IST** (end of Day 2 work block).
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 0. TL;DR (updated 26 Sep 05:20 IST)
+## 0. TL;DR — where we are
 
-- **Best public so far: 0.964** (day1_5). Leader 0.9884, top-15 ≈ 0.984, top-100 ≈ 0.97.
-- **Morning file (validated): `submissions/day2_best/matching_results.tsv`** = equal blend of exp13 + exp14 + exp15
-  (three 800k-S1 crowd-trained LightGBMs on different S1 samples; common-OOF on 105k S1 = **0.98041** vs singles
-  0.9801). Fallbacks: `day2_blend_13_14` (0.98040 on 290k S1), `day2_final` (0.7·exp13 + 0.3·blend(10,11,12)),
-  non-crowd alternative `day2_exp09_wide` (OOF 0.9795, normal conditions).
-  All are LightGBM models with **wide blocking + stage-1 filter (11.9 cand/S1, was 29.5)** and **crowd training**
-  (train pool augmented with 50% synthetic fake branches to match test density). exp13 alone: OOF 0.9804
-  (IN .9776 US .9822) under crowded conditions (our previous best, exp06, was 0.9771 under easier normal conditions).
-- **Local metric to trust: OOF macro-F0.5 on the FULL `dataset/train`**; prefer the crowded version (`--crowd 0.5`)
-  and check unseen-country behaviour with `dev/crowd_eval.py --country-folds`. **Never use `val`/`val2`** (§4).
-- Why we were stuck at 0.96: (a) test has 40-55% more fake-branch distractors per S1 than train (France ≫) → models
-  trained at train density over-accept and lose recall in dense regions; (b) narrow blocking capped recall; (c) France
-  weakest (≈0.91 by probe). Overnight fixes target all three (§9).
-- Suggested Day-2 slot plan: (1) day2_best; (2) if it clearly beats 0.964, try day2_exp13 or a threshold variant from
-  saved `test_scores.parquet` only if local evidence supports it; (3) keep 1-2 slots for new ideas (§8).
+| item | value |
+|---|---|
+| **Best public score** | **0.969** — `submissions/day2_Aprime` (exp17 + "France house-number rule") |
+| Pending upload | `submissions/day2_C_us_shift` (= Aprime + "US shifted-house-number rule"); C − 0.969 = exact US effect |
+| Leaderboard (26 Sep evening) | leader > 0.99, top-100 ≈ 0.985+, we are ~600th |
+| Honest local score (best model) | exp21 OOF 0.9817; exp17 OOF 0.98146 (same 800k-S1 sample) |
+| Public decomposition (exact, from probes) | **US+India ≈ 0.9745** (85% of S1) · **France ≈ 0.938** (15% of S1) |
+| Deadline | leaderboard closes **27 Sep 23:59 IST**; package (zip) ready by **27 Sep 18:00 IST** |
+
+**The one-paragraph story.** Blocking + a LightGBM pair model + tuned decision rule gets ~0.98 locally. Every
+submission scored ~0.013 below its local estimate. Probes (§5.4) located the loss: France was ~0.88→0.94 and
+US/India ~0.97. EDA + adversarial validation traced both to **fake branches** (a *different* business with the S1's
+name and a *shifted house number*) being accepted as copies: in France because our learned branch-word feature only
+knows English/Indian branch words and French copies never carry house-number noise; in the US because test accepts
+2.7× more "same street, number ±1..30" pairs than train. A simple, data-driven rule for France gave +0.003 public.
+The US analogue (submission C) is waiting to be scored.
+
+**Start here tomorrow (Day 3):**
+1. Upload `submissions/day2_C_us_shift/matching_results.tsv` if not done; record the score. Decision rule in §9.
+2. Build the final file = best of {Aprime, C} (+ the India version of the rule if C wins) — §10.1.
+3. Package by 18:00 IST (§11). Everything must be reproducible from code (`run_pipeline.py` + `postprocess.py`).
 
 ---------------------------------------------------------------------------------------------------------------
 
 ## 1. How to run (from `student_resource/`)
 
 ```bash
-# one-time environment (Python 3.12; system 3.14 is too new for some wheels)
+# one-time environment (Python 3.12; the system python3 3.14 is too new for some wheels)
 /opt/homebrew/bin/python3.12 -m venv .venv
 .venv/bin/pip install -r code/business_entity_resolution/requirements.txt
 
-# full pipeline: train on dataset/train, predict dataset/test (LightGBM mode is default)
-.venv/bin/python code/business_entity_resolution/src/run_pipeline.py \
-    --train-dir dataset/train --test-dir dataset/test --out-dir runs/expNN_test
+# model run: train on dataset/train, score dataset/test  (~100 min cold, ~55-60 min with blocking caches)
+.venv/bin/python code/business_entity_resolution/src/run_pipeline.py --train-dir dataset/train \
+    --test-dir dataset/test --out-dir runs/expNN_test --crowd 0.5 --sample-seed 3 --model-s1 800000 [--profile exp17]
 
-# checks before any upload
-python3 utils/validate_submission.py --matching runs/expNN_test/matching_results.tsv \
-    --candidate runs/expNN_test/candidate_pairs.tsv --test-dir dataset/test
-.venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir runs/expNN_test --test-dir dataset/test
+# post-processing rules on a run's saved scores (minutes) — reproduces the submitted files
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp17_test --out output --house-rule
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp17_test --out output --house-rule --shift-rule US
+
+# checks before ANY upload
+python3 utils/validate_submission.py --matching output/matching_results.tsv --candidate output/candidate_pairs.tsv --test-dir dataset/test
+.venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir output --test-dir dataset/test
 ```
 
-Useful flags of `run_pipeline.py`:
-- `--mode rule|lgbm` (default lgbm). `--model-s1 N` train S1 sampled for the matching model (default config.MODEL_S1=300k).
-- `--oof-only` stop after the honest OOF score (no test inference). `--cv country` leave-one-country-out folds.
-- `--fixed-rounds R --params-from runs/X/report/oof.json` skip CV (fast; used for exp07). `--sample-seed k` different S1 sample.
-- `--crowd f` add f×(distractor count) synthetic fake branches to the TRAIN pool (§6.4).
+**Reproducing the public-0.969 file (Aprime):**
+`run_pipeline.py ... --out-dir runs/exp17_test --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17`
+then `postprocess.py --run runs/exp17_test --out <dir> --house-rule`. (`--profile exp17` restores exp17's settings:
+learned xtok features kept, no count clipping, original postcode parser. `config.py` defaults are the exp21
+settings.) Day2_C = same + `--shift-rule US`. `postprocess.py` was checked to reproduce both submitted files.
 
-Outputs per run dir: `matching_results.tsv`, `candidate_pairs.tsv`, `run_info.json`, `test_scores.parquet`
-(every candidate pair with its model score → lets you re-decide thresholds / blend without re-running),
-`report/oof.json` (OOF score, tuned params, per-country OOF), `report/oof_pairs.parquet`, `report/oof_s1.parquet`,
-`report/feature_importance.csv`.
+`run_pipeline.py` flags: `--mode lgbm|rule`, `--model-s1 N` (train S1 sampled for the pair model), `--sample-seed k`,
+`--crowd f` (train-time synthetic fake branches, §6.3), `--s1-branches f` (augmentation v2, built, not yet evaluated),
+`--oof-only`, `--cv group|country`, `--fixed-rounds R --params-from X/report/oof.json` (skip CV), `--profile`.
 
-Blending two runs (same OOF sample → evaluated on OOF first):
-`.venv/bin/python code/business_entity_resolution/dev/blend.py runs/A runs/B [--w 0.5] [--params-from ...] [--write runs/blend]`
+Outputs per run dir: `matching_results.tsv`, `candidate_pairs.tsv`, `run_info.json`, **`test_scores.parquet`**
+(every scored test pair → re-decide/blend/post-process without re-running), `report/oof.json` (OOF score, tuned
+params, per-country OOF), `report/oof_pairs.parquet`, `report/oof_s1.parquet`, `report/feature_importance.csv`.
 
-Runtime (M4 Pro, 12 cores, 24 GB, no GPU): full run ≈ 100 min when blocking must be recomputed (train blocking of
-2.2M S1 ≈ 30-35 min, test ≈ 20-25 min); ≈ 55 min when both blocking caches exist (`cache/blocks/`).
-**Memory: never run two full pipelines at once** (each peaks at 12-15 GB).
+Blends: `dev/blend.py runs/A runs/B [--w 0.5] [--params-from P] [--write runs/blend]` (evaluates on the S1 common to
+both OOF samples); `dev/blend3_eval.py runs/A runs/B runs/C` (all subsets on the common S1).
+Packaging a run: `dev/package.sh runs/X submissions/NAME "note"` (validator + sanity + copy + NOTE.md).
 
-Caches (gitignored, safe to delete, rebuilt automatically): `cache/norm_s{1,2,3}.parquet` normalised text for all
-22M records (2.6 min to build); `cache/blocks/*.parquet` candidate frames keyed by (config, ids, NORM_VERSION, stage-1 cfg).
+**Runtime / memory (Apple M4 Pro, 12 cores, 24 GB, no GPU):** normalisation cache for all 22M records 2.6 min;
+train wide blocking + stage-1 ≈ 35-45 min; test ≈ 25 min; 800k-S1 model 5-fold CV ≈ 20 min; test scoring ≈ 15 min.
+**Never run two full pipelines at once** (12-15 GB peak each). Caches (gitignored, safe to delete):
+`cache/norm_s{1,2,3}.parquet`, `cache/blocks/*.parquet` (key = blocking config, NORM_VERSION, stage-1 config,
+record ids). `runs/`, `splits/`, `cache/`, `dataset/`, `.venv/` and all output TSVs are gitignored — teammates must
+regenerate runs locally.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 2. Data facts (Stage 0)
+## 2. Data facts
 
-- Train: S1 2,206,820 (US 1.32M, India 0.88M) | S2 5.03M | S3 5.29M. Test: S1 1,732,543 (India 810k, US 663k,
-  **France 259k = 15%**) | S2 4.89M | S3 5.08M.
-- **Test has ~24% more pool per S1 than train in every country** (5.5-5.8 vs 4.7) — see §6.3 for what those are.
-- Singleton rate 0.056 (predict-all-empty floor). Matches per S1 mean ≈ 3.5 (0:123k 1:119k 2:375k 3:531k 4:484k 5:322k 6:165k 7+:87k).
-- **One-to-one is strict** (no S2/S3 id in two S1 lists) → greedy one-to-one assignment is enabled.
-- **All 7.64M true pairs share the country label** → hard-block by country (France gets its own block automatically).
+- Train: S1 2,206,820 (US 1.32M, India 0.88M) · S2 5.03M · S3 5.29M. Test: S1 1,732,543 (India 810k, US 663k,
+  **France 259k = 14.98%**) · S2 4.89M · S3 5.08M. Test has ~24% more pool per S1 in every country (5.5-5.8 vs 4.7);
+  the extra ~1 record/S1 is almost all LOW-similarity (claimed records with best sim ≥0.8/S1: US 1.66→1.78, IN 2.14→2.34).
+- Singleton rate 0.056 (predict-all-empty floor). Matches per non-singleton S1 ≈ 3.66 (0:123k 1:119k 2:375k
+  3:531k 4:484k 5:322k 6:165k 7+:87k). Copies per S1 by source: S2 {0:8%,1:38%,2:31%,3:16%,4+:7%}, S3 similar.
+- **One-to-one is strict** (no S2/S3 id in two S1 lists) → greedy one-to-one decision.
+- **All 7.64M true pairs share the country label** → hard-block by country (France is its own block).
 - 26% of the train pool matches no S1 (distractors). Exact normalised-name equality in only 22% of true pairs.
-- S1 never has empty addresses; ~3% of S2/S3 do. Postcodes are rare (~7%).
-- India: 18% of partner names are native script (Devanagari/Tamil/Telugu/Bengali/Gujarati/Odia…), many addresses have
-  native-script state names. 24% (India) / 8% (US) of true pairs share **no** Latin name token (native script, domains
-  like `revitup.com`, `@handle`, fully random names like "Wexavi"), but **name OR address always shares a token**.
-- Noise in true copies: token shuffles, dropped tokens, added suffixes ([Inc], (Corp), Center, Services, Dr, Shri, The),
-  OCR typos (Muri1lo, Humme1, 0↔o), injected accents, house-number noise (7 vs 5, 0700, 1610-, 1976-1978), "NULL",
-  "##95", component reordering, St/Street/**Saint**, state code vs name vs native script, city variants.
-- **Hard negatives = synthetic "sibling branches"**: same name + a branch word (holdings, group, ventures, east,
-  riverside, downtown, infratech, exports…; in France: Distribution, Développement, Participations, Groupe, Associés)
-  and the **house number nudged by ~1-30** (30→34, 8520→8527, 46→53). 80% of singletons' top candidate is one.
-- No leakage: file order and id numbers are uncorrelated with matches (corr 0.000).
-- France: names = generic French words + legal form (SARL/SAS/EURL/SASU/SCI/SA/EI/SNC), few cities, street words
-  Rue/R./BD/Av./Cours/Chemin/Quai, "Bis", "N°", regions vs départements. Very dense: **16 candidates with
-  blocking sim ≥ 0.5 per S1 vs ~5 in US/India; ~9 branch-like candidates per S1**.
+- S1 never has an empty address; ~3% of S2/S3 do (14-17 empty-address pool records per 100 S1 in every country).
+- No leakage: file order and id numbers are uncorrelated with matches (corr ≈ 0.000).
+- **US addresses contain essentially no ZIP codes**; 5-digit numbers are house numbers (≈10% of US addresses).
+- France: names are generic French words + legal form (SARL/SAS/EURL/SASU/SCI/SA/EI/SNC); few cities; very dense
+  (16 candidates with blocking sim ≥0.5 per S1 vs ~5 US/IN); 12% of French S1 share an exact address with another S1
+  (US/IN 4-5.6%); 10-20× more acronym records (9.2 vs 0.5-1.1 per 100 S1).
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 3. Pipeline (code/business_entity_resolution/src)
+## 3. The data generator — what we reverse-engineered
 
-1. **normalize.py** — NFKD accent strip, `&`→and, Indic→Latin transliteration with ONE table (all Indic Unicode
-   blocks share the same 128-code-point layout), OCR digit fix inside words, merge single-letter runs (L.L.C.→llc),
-   abbreviation expansion, legal-form removal (US/IN/FR lists), DBA split, domain/@handle → compact name; address
-   contraction (street/st/saint→st, rue→r …), postcode + house numbers + landmark flag. Hand-written lists only.
-   **Learned transliteration dict** (`build_translit_dict`): aligns tokens of true (Latin S1, native-script pool)
-   TRAIN pairs → 567 mappings (pharst→first, payoniyar→pioneer, enarji→energy). Native-pair token overlap 0.21→0.94.
-2. **blocking.py** — per country, sparse IDF-cosine top-K via chunked matmul (processes) + per-row argpartition.
-   Spaces: `combo` (name_core + addr unigrams/bigrams), `combo_c` (name char-4-grams + addr uni/bigrams),
-   `name_c4`, `addr_tok`, `name_bi`, `name_tok`. max_df prunes common features. Optional per-country `post` hook.
-3. **stage1.py** (new, exp09) — cheap LightGBM on blocking sims/ranks + 3 rapidfuzz scores + house agreement +
-   per-S1 gaps; keeps p ≥ 0.001 (≤ 20 per S1). Trained on held-out train S1 (not in the matching-model sample).
-4. **features.py** — rapidfuzz name/address similarities, compact/acronym/DBA, postcode & house-number states,
-   house cluster features, **learned extra-token encoding** (`xtok_*`, OOF target encoding of branch words),
-   **unsupervised branch-word detector** (`hmis_*`: per extra token, rate of co-occurring with a changed house
-   number, computed on each dataset's own candidates → works for French words), **branch signature**
-   (same street, number nudged ≤ 30), name-duplicate counts, context features (within-S1 rank/gap/n_close and
-   **candidate-side** rank/gap/#S1 claiming the record, computed on the FULL candidate set).
+**True copies (S2/S3 records of an S1)** are generated *independently* from the S1 with noise operations:
+token shuffle/drop, added suffixes ([Inc], (Corp), Center, Services, Dr, Shri, The), legal-form changes, OCR typos
+(Muri1lo, Humme1, 0↔o), injected accents, UPPERCASE (S2 style), domain/handle names (`revitup.com`, `@handle`),
+acronyms (RC, PM), fully random made-up names at the exact address (Wexavi, Yumavera), native-script names for India
+(Devanagari/Tamil/Telugu/Bengali/Gujarati/Odia; 18% of Indian partner names), empty address (~4% of true pairs),
+"NULL"/"##" junk, component reordering, St/Street/**Saint**, state code↔name↔native script, city variants.
+**House-number noise on true copies in US/India** (equal 70% of true pairs; digit drop/add 3432→432 4.6%;
+zero-padding 0700; ranges 1976-1978; small shifts; unit numbers). **French copies carry almost no house-number noise**
+(accepted digit-drop pairs 1.05 per 100 S1 in France vs ~20 in US/India; house-diff share of accepted pairs 4.4% vs
+14.4% US / 19.7% IN).
+
+**Fake branches ("sibling branches", the hard negatives)**: a *different* business record = the S1 name (often + a
+branch word: holdings, group, ventures, east, riverside, downtown, infratech, exports…; in France Distribution,
+Développement, Participations, Groupe, Holding, International) with the **house number shifted by ~1-30**
+(30→34, 8520→8527, 46→53). They often come with their own noisy copies. 80% of singletons' top candidate is one.
+In test there are more of them per S1 than in train (branch-like candidates per S1: US 1.02→1.58, IN 1.37→1.89,
+France ≈9.2).
+
+**Unresolvable ties**: an empty-address copy whose (core) name is shared by k S1 records belongs to one of them with
+P≈1/k (exact name shared by 2 → P(true)=0.465, by 3 → 0.31, 4+ → 0.02). Raw-name (legal form/punctuation kept)
+breaks 58% of answerable ties with 78% accuracy; the S1's other copies do NOT help (31-38% — copies are independent).
+
+---------------------------------------------------------------------------------------------------------------
+
+## 4. Pipeline (code/business_entity_resolution/src)
+
+1. **normalize.py** — NFKD accent strip, `&`→and; Indic→Latin transliteration with ONE table (all Indic Unicode blocks
+   share one 128-code-point layout); OCR digit fix; single-letter-run merge (L.L.C.→llc); abbreviation expansion;
+   legal-form removal (US/IN/FR lists); DBA split; domain/@handle → compact name; address contraction
+   (street/st/saint→st, rue→r…); postcode / house numbers / landmark flag. **Learned transliteration dict** from TRAIN
+   true pairs (567 tokens: pharst→first, payoniyar→pioneer; native-pair token overlap 0.21→0.94).
+   **`reparse_numbers`** (exp21 bug fix): postcode only when a comma component on its own, a trailing "STATE 12345",
+   or a 6-digit PIN that is not the first number (the old rule threw away 5-digit US house numbers: 8.9% of US S1).
+2. **blocking.py** — per country, sparse IDF-cosine top-K (chunked matmul in processes, per-row argpartition).
+   Current: `combo_c` (name char-4-grams + address uni/bigrams) K=60 + `combo` (name + address words) K=30,
+   max_df 20000; per-country post-hook.
+3. **stage1.py** — cheap LightGBM (blocking sims/ranks, 3 rapidfuzz scores, house agreement, per-S1 gaps) trained on
+   held-out train S1; keeps p ≥ 0.001, ≤ 20 per S1 → **~12 candidates per S1** (France 16.7). This is the set scored
+   by the model and written to candidate_pairs.tsv (organiser email: smaller candidate sets rank higher).
+4. **features.py** — ~95 features: name similarities (norm/core/compact/raw), acronym/DBA, address similarities,
+   postcode state, house-number relation (equal, |diff|, relative diff, small shift ≤30, digit substring/Levenshtein,
+   same length, branch signature, cluster size), learned extra-token encoding `xtok_*` (OOF target encoding —
+   DROPPED in exp20/21, see §6.5), label-free branch-word detector `hmis_*` (rate at which an extra token co-occurs with
+   a changed house number, computed on each dataset's own candidates), name/address duplicate counts (clipped at 10
+   in exp20/21), context features: within-S1 rank/gap/n_close and **candidate-side** rank/gap/#S1 claiming the record
+   for blocking sims and for name/compact/address/raw-name similarities (computed on the FULL candidate set).
+   Augmentations: `add_synthetic_branches` (crowd v1: nudged copies of distractors), `add_s1_branches` (v2:
+   S1 name ± branch word + shifted number; built, NOT evaluated).
 5. **model.py** — LightGBM (lr 0.1, 127 leaves, deterministic), GroupKFold by S1 → OOF; final single model on all
    sampled pairs with rounds = 1.1 × mean best_iter.
-6. **decide.py** — greedy one-to-one, then keep top-1 if p ≥ t1, extras if p ≥ t2 and p ≥ r·best; (t1,t2,r) tuned by
-   coordinate descent on OOF macro-F0.5 (numpy, seconds).
-7. **run_pipeline.py** — orchestration; **sanity_check.py** — row counts, per-country empty rate (France present),
-   matches ⊆ candidates.
+6. **decide.py** — greedy one-to-one, keep top-1 if p ≥ t1, extras if p ≥ t2 and p ≥ r·best; (t1,t2,r) tuned on OOF
+   macro-F0.5 by coordinate descent (typ. t1≈0.72-0.76, t2≈0.70-0.74, r=0).
+7. **postprocess.py** — the France house rule and US shift rule (§6.6-6.7). **sanity_check.py** — row counts,
+   per-country empty rate, France present, matches ⊆ candidates. **run_pipeline.py** — orchestration.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 4. How to evaluate (IMPORTANT — we learned this the hard way)
+## 5. How to evaluate (learned the hard way — read this)
 
-- `evaluate.py make-split --mode random` assigns distractors randomly, so ~80% of a val S1's fake branches land on the
-  TRAIN side → **val is optimistic**. Rule baseline: val 0.773 vs public 0.679.
-- **Honest local metric = OOF on the full `dataset/train`** (every S1 has all its distractors). Rule tuning-OOF 0.680 ≈
-  public 0.679. For the LightGBM it is still ~0.013-0.019 above public because of the train→test shift (§6).
-- **Unseen-country simulator**: `dev/country_cv.py` (train on one country, predict the other). Drop vs group CV =
-  0.0144 (0.9752→0.9608) ≈ our public gap. Use it to reject features that only work on seen countries.
-- **Crowding simulator**: `--crowd` / `dev/crowd_eval.py` add synthetic fake branches (nudged copies of distractors)
-  to mimic test density.
-- **France probe** (costs a slot): take a submitted file, empty all France rows, resubmit:
-  F_France ≈ (score − probe)/0.1498 + s_France (s≈0.05).
-
----------------------------------------------------------------------------------------------------------------
-
-## 5. Experiments (local = honest OOF on full train unless stated)
-
-| tag | change | local | per-country | public | notes |
-|---|---|---|---|---|---|
-| exp01 | rule: max(combo, .8·name_c4), o2o | val 0.773 (tune-OOF 0.680) | loco IN 0.694 / US 0.695 | **0.679** | day1_1 |
-| exp02 | LightGBM 53 feats, 400k S1 | OOF(val-train) 0.9622 | – | – | cand-side rank dominates |
-| exp03 | + xtok + house cluster feats (smoke, 20-40k S1) | OOF(val-train) 0.9650-0.9671 | IN .954 US .976 | – | |
-| exp04 | + learned translit + name-dup, 250k S1, full train | **0.9736** | IN .9662 US .9785 | **0.955** | day1_2 |
-| probe | exp04 with France rows emptied | – | – | **0.831** | ⇒ France ≈ 0.88, US+IN ≈ 0.968 |
-| exp05 | blocking combo_c25+combo15 (train recall .9756, 30/S1) + hmis, 300k S1 | **0.9769** | IN .9716 US .9805 | **0.963** | day1_4; France ≈ 0.91 |
-| exp06 | + branch-signature feats, − length feats | 0.9771 | IN .9719 US .9805 | – | changes France preds 2.3× more than US/IN |
-| exp07 | exp06 feats, 600k S1 (seed+1), no CV | – | – | – | |
-| blend | 0.5·exp06 + 0.5·exp07 | (blend05/06 OOF 0.97726) | – | **0.964** | day1_5 |
-| exp08 | exp06 + `--crowd 0.5` | stopped after caching crowded blocking | – | – | used by crowd_eval |
-| exp09 | wide blocking c60+c30 + stage-1 (~11/S1, recall .9819) | **0.9795** | IN .9763 US .9817 | – | 2.7× fewer candidates |
-| exp10 | exp09 + crowd 0.5 (train-time synthetic branches) | 0.9789 (crowded OOF) | IN .9756 US .9811 | – | |
-| exp11 | exp10, seed+1, 400k S1 | 0.9794 (crowded) | IN .9761 US .9816 | – | |
-| exp12 | exp10, seed+2, 400k S1 | 0.9792 (crowded) | IN .9762 US .9812 | – | |
-| exp13 | exp10, seed+3, **800k S1** | **0.9804** (crowded) | IN .9776 US .9822 | – | best single |
-| exp14 | exp10, seed+4, 800k S1 | 0.9800 (crowded) | IN .9773 US .9819 | – | |
-| exp15 | exp10, seed+5, 800k S1 | ≈0.9802 (crowded) | IN .9774 US .9822 | – | |
-| blends | 10+11: 0.97935 (54k S1); 11+12: 0.98016 (72k); 13+14: 0.98040 (290k); **13+14+15: 0.98041 (105k)** | | | | **day2_best = equal 13/14/15** |
-
-Blocking tables (30k train-part S1, with learned translit):
-- combo20+c4_10 0.9735 @26.6/S1 · combo_c20+combo10 0.9770 @22.5 · **combo_c25+combo15 0.9813 @30.0** ·
-  combo_c30+combo20+c4_10 0.9846 @42 · union K60/30 0.9888 @72.
-- **Stage-1 (cheap string feats) on the K60/30 union: p≥0.001 → 10.0/S1 recall 0.9842 oracle 0.9952;
-  top-12 → 0.9833; top-20 → 0.9860.** (Stage-1 on blocking-only features was weak: top-10 0.959.)
-- Crowding (+60% synthetic branches): combo_c25+combo15 0.9813→0.9793 only; K60+30 0.9877.
-
-Unseen-country simulator (country folds, 100-150k S1): all 0.9608 · no_xtok 0.9609 · no_dup 0.9588 ·
-no_cand_ctx 0.9570 · **no_len 0.9626** (group CV unchanged 0.9751) → length feats removed in exp06.
-Stricter thresholds on the unseen country: +0.002 US, 0 India → no France-specific thresholds.
-Extra unseen-country loss is **false positives** (has_FP 0.0017→0.0054 IN, 0.0019→0.0088 US), recall unchanged.
-
-OOF loss decomposition (exp05/06, total ≈ 0.023): recall-only 0.0131 (45-54% caused by blocking misses),
-non-singleton predicted empty 0.0051, a wrong match included 0.0036, singleton given a match 0.0013.
-Pair precision ≈ 0.995; scores are well calibrated (only ~7% of pairs in 0.1-0.9).
-
-Rejected ideas (with evidence): per-country (France) strict thresholds (~0 gain) · expected-F0.5 decision
-(0.9763 < 0.9771) · word-substitution as France FP signal (same share in all countries; 98% positive in train) ·
-removing xtok (no change) · removing candidate-side context (worse).
+5.1 **Never use `val`/`val2`** (`evaluate.py make-split --mode random`): distractors are assigned randomly, so ~80% of
+a val S1's fake branches land on the train side → optimistic (rule baseline: val 0.773 vs public 0.679).
+5.2 **Honest local metric = OOF macro-F0.5 on the FULL `dataset/train`** (all distractors present). Compare models on
+the SAME `--sample-seed`/`--model-s1` (identical S1 sample) or with `dev/blend.py` / `blend3_eval.py` on common S1.
+5.3 Simulators: `dev/country_cv.py` (train one country, predict the other), `dev/crowd_eval.py [--country-folds]`
+(normal vs crowd-trained model on normal vs crowded validation), `dev/adversarial.py` (train-vs-test classifier per
+country; its top features = what shifted). **The country simulator missed the French problem** because US and
+India share English branch words — adversarial validation found it.
+5.4 **Probes and exact attribution** (the most useful tool we found). F0.5 is per S1 and blocking/one-to-one never
+cross countries, so rows of different countries are independent:
+- France-empty probe P of a file S: US+India F = (P − 0.1498·0.05)/0.8502; France F = (S − P)/0.1498 + 0.05.
+- To measure a change in one country exactly: keep the other countries' rows identical to an already-scored file.
+- Probes so far: exp04 → US+IN 0.969, France 0.877. exp17 → **US+IN 0.9745**; Aprime → **France 0.938**.
+5.5 Local→public gap history: 0.9736→0.955, 0.9769→0.963, 0.9773→0.964, ~0.9804→0.966. Constant ~0.013-0.019 =
+France deficit + US fake-branch acceptances.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 6. What we learned (chronological, most important first)
+## 6. Findings (most important first; all with evidence)
 
-6.1 **val split is optimistic** (§4). 6.2 **LightGBM ≫ rule** (0.68 → 0.955). Candidate-side context
-(`ctx_*_rank_cand`, `gap_cand`) is the top feature: "does another S1 fit this record better".
-6.3 **Test is harder than train**: per S1, branch-like candidates (same street, number nudged ≤30):
-train US 1.02 / IN 1.37 → **test US 1.58 (+54%), IN 1.89 (+38%), France 9.2**; copy-like candidates (same number,
-name tset ≥ 80) unchanged (~2.0; France 2.7). Predicted matches per S1 on test ≈ train. ⇒ extra test pool =
-distractors, not copies. The model's odds are learned at train density → over-accepts on test.
-6.4 **France is the weakest country** (probe): ≈0.88 (exp04) → ≈0.91 (exp05, thanks to the unsupervised hmis
-branch-word feature). US+India ≈ 0.97 on test. Gap to leader ≈ 0.011 from France + 0.014 from US/India.
-6.5 French true matches sit deep in candidate ranks 3× more than US (rank 18-24 of 25: 1.26% vs 0.40%; found only by
-`combo`: 2.06% vs 0.65%) → narrow K cuts French copies → wide blocking + stage-1 (exp09).
-6.6 Unseen-country FPs are branch records with nudged numbers and name-only empty-address records owned by a
-same-name S1 → branch-signature features (exp06).
+6.1 **LightGBM ≫ rule** (0.679 → 0.955). Candidate-side context ("does another S1 fit this record better") is the top
+feature family.
+6.2 **Blocking**: wide blocking + stage-1 filter beats narrow blocking on both recall and size — train recall after
+stage-1 0.9819 at ~11 cand/S1 vs 0.9756 at 30/S1 (exp09 OOF 0.9795 vs exp06 0.9771). Table (30k train S1):
+combo20+c4_10 0.9735@26.6 · combo_c20+combo10 0.9770@22.5 · combo_c25+combo15 0.9813@30 · union K60/30 0.9888@72 ·
+stage-1 on that union p≥0.001 → 0.9842@10.0 (oracle 0.9952).
+6.3 **Crowd training** (+50% synthetic fake branches in the train pool): A/B on crowded validation +0.0031 (seen
+countries) and +0.0017 (unseen country); normal model loses 0.0048 under crowding. Used since exp10.
+6.4 **More data + bagging**: 800k S1 > 300-400k (logloss 0.027→0.025); 3-seed blends +0.0003-0.0004 on common S1.
+6.5 **France, learned branch words are blind** (adversarial AUC 0.998): `xtok_sum` train 2.14 vs France 0.36. exp17
+accepted **23,364 French pairs whose candidate ADDS a French branch word (9 per 100 S1) vs 0 in US / 20 in India**
+("HM Residence SAS | 30 Rue des Lilas" ← "HM RÉSIDENCE DÉVELOPPEMENT SAS | NO 32"). Dropping xtok (exp20) fixed that
+(23,364 → 839) BUT also dropped 59,868 French pairs of which 67% had the SAME house number (swapped generic word:
+"4l Ecole SARL" → "4l Amicale Sarl") because the label-free hmis detector is polluted on dense French streets
+("club" 0.74, "nantes" 0.84) → exp20 France predictions NOT used (idea "A", never submitted).
+6.6 **France house rule (SUBMITTED, +0.003 public)**: French true copies keep their house number, so French accepted
+pairs whose first house number differs are fake branches. Aprime = exp17 minus 39,575 such pairs (2,044 French S1
+become empty; French empty rate 5.0% → 5.8%, matching other countries) → **public 0.969, France 0.925→0.938**.
+6.7 **US shifted numbers (TESTING with day2_C)**: with corrected parsing, accepted "same street, number ±1..30" pairs
+per 100 S1: US train 3.68 (precision 0.978) vs **US test 9.89**; India 5.87 vs 6.88. The ~6 extra per 100 US S1 would
+explain US+IN 0.9745 vs local ~0.981 if they are fake branches — but in train such pairs are true 70% (US) / 91% (IN)
+of the time, so only a submission can decide. The 5-digit parsing fix did not change the test count (9.79→9.89).
+6.8 **5-digit US house numbers were parsed as postcodes** (bug; 8.9% of US S1 / 6.3% of US pool had no house number)
+→ fixed in exp21 (OOF US .9832→.9838).
+6.9 **Empty-address copies are the biggest local miss** (recall 0.544 vs 0.99 for every other record type; 3.9% of true
+pairs; 64% of model misses) and are mostly unresolvable ties (§3). Raw-name features (exp17) break some ties.
+6.10 **House-number EDA** (train): digit drop/add is TRUE 46% of the time (4.6% of true pairs); same-length shift ≤30
+is true 6.7%; one digit changed 40%. exp17's digit-level features cut false merges by 18% (11,597→9,500 FP pairs).
+6.11 **Size-dependent counts shift** (US test has half the S1 of US train): name-dup mean 35→19 → clipped at 10 (exp20).
+6.12 India: learned transliteration fixed native-script names (India OOF 0.954→0.966, exp03→exp04).
+6.13 France checks that were NOT the problem: acronyms (95.5% accepted when they equal the S1 initials), co-located
+S1 (normal behaviour), name sharing (FR 52% ≈ IN 53%), rejected copy-like records (≤ +0.002 even if all accepted),
+blocking-score saturation (no cross-S1 ties), acronym density.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 7. Submissions
+## 7. Experiments (local = honest OOF on full train; "crowded" = train pool with synthetic branches)
 
-| day/slot | file | tag | local | public |
+| tag | change | local OOF | IN / US | public |
 |---|---|---|---|---|
-| day1_1 | submissions/day1_1 | exp01 rule | val 0.773 | 0.679 |
-| day1_2 | submissions/day1_2 | exp04 | OOF 0.9736 | 0.955 |
-| day1_3 | submissions/day1_3_probe | exp04, France emptied (diagnostic) | – | 0.831 |
-| day1_4 | submissions/day1_4 | exp05 | OOF 0.9769 | 0.963 |
-| day1_5 | submissions/day1_5_final | 0.5·exp06 + 0.5·exp07 | OOF ≈0.9773 | **0.964** |
+| exp01 | rule: max(combo, 0.8·name_c4), one-to-one | tune-OOF 0.680 | loco .694/.695 | **0.679** |
+| exp02 | LightGBM 53 feats, 400k S1 | 0.9622 (val-train) | – | – |
+| exp03 | + xtok + house cluster feats (smoke) | 0.965-0.967 | .954/.976 | – |
+| exp04 | + learned translit + name-dup, 250k S1 | 0.9736 | .9662/.9785 | **0.955** |
+| exp05 | blocking combo_c25+combo15, hmis, 300k S1 | 0.9769 | .9716/.9805 | **0.963** |
+| exp06 | + branch-signature, − length feats | 0.9771 | .9719/.9805 | – |
+| exp06+07 blend | 0.5/0.5 (exp07 = 600k S1, no CV) | ≈0.9773 | – | **0.964** |
+| exp09 | wide blocking K60/30 + stage-1 (~12 cand/S1) | 0.9795 | .9763/.9817 | – |
+| exp10-12 | exp09 + crowd 0.5 (300-400k S1, seeds 0-2) | 0.9789-0.9794 (crowded) | – | – |
+| exp13-15 | crowd 0.5, 800k S1, seeds 3/4/5 | 0.9804 / 0.9800 / 0.9802 | .9776/.9822 (13) | blend 13/14/15 **0.966** |
+| exp16 | + cand-side name/address competition, addr dup counts | 0.9807 (seed 3) | .9781/.9824 | – |
+| exp17 | + raw-name features + digit-level house relation | **0.98146** (seed 3) | .9788/.9832 | via Aprime **0.969** |
+| exp18/19 | exp17 features, seeds 4/5 | 0.9812 / 0.9814 | – | blend 17/18/19 = 0.98145 (105k common S1) |
+| exp20 | exp17 − xtok, counts clipped at 10 | 0.9813 (seed 3) | .9787/.9831 | not submitted (France recall loss) |
+| exp21 | exp20 + 5-digit house-number parsing fix | **0.9817** (seed 3) | .9785/.9838 | – |
 
-Rules for slots: max 5/day. Each slot should either improve the honest local score or answer a question (probe).
-TSV outputs are gitignored (large); NOTE.md files in each submission folder record config + scores.
-
----------------------------------------------------------------------------------------------------------------
-
-## 8. Next steps (ranked, for whoever picks this up)
-
-1. **Finish/evaluate exp09** (wide blocking + stage-1). Expect higher recall (+0.3% pairs → ~+0.002-0.004) AND
-   3× smaller candidate_pairs.tsv (organiser email: smaller candidate sets rank higher in final evaluation).
-2. **Density shift** (§6.3): if `runs/crowd_eval.log` shows model B (trained crowded) beats A on crowded val
-   without losing on normal val → rerun exp09 with `--crowd 0.5` (needs new crowded wide blocking ~+50 min).
-   Also consider more realistic synthetic branches (S1/copy + learned branch word + nudged number).
-3. **France**: measure with another probe only if needed; ideas: relative max_df (France vocab is tiny), France-like
-   density in training (crowd), candidate-to-candidate support (true copies agree with each other, branch copies
-   agree on the wrong number), transitivity/clustering of pool records.
-4. **Model recall** (~2.8% of true pairs missed by the model at p<0.1): name-only empty-address copies with
-   ambiguous names, random-name copies at the exact address. Sibling-support stacking is the planned fix.
-5. Optional reranker on borderline pairs with a small MIT/Apache model (e.g. multilingual MiniLM, Apache-2.0) —
-   ask Yash before adding any model/dependency; no CUDA here (MPS only).
-6. **Do NOT**: tune thresholds on public LB, hand-label test, pseudo-label test without asking organisers (rule 7).
-7. Package (Day 3 by 18:00): README, requirements, Documentation_template.md (use this file + experiments table),
-   clean-room reproduction, zip `<team>_submission.zip`.
+Other results: expected-F0.5 decision 0.9763 < tuned thresholds 0.9771 (rejected). Stricter thresholds for an
+unseen country: +0.002 US / 0 India (rejected). Unseen-country simulator: all 0.9608, no_xtok 0.9609, no_dup 0.9588,
+no_cand_ctx 0.9570, no_len 0.9626 (length feats removed).
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 9. Overnight log (26 Sep)
+## 8. Submissions (5 per day; public LB = subset of test)
 
-- 00:00 exp09 code: wide blocking + stage-1 filter; mini end-to-end smoke (30k train S1 / 10k test S1) passed.
-- 00:15 `runs/night_chain.sh` started: waits for exp08's crowded blocking cache → stops exp08 → exp09 → crowd_eval.
-- 00:22 stage-1 trained on 60k held-out train S1: wide union 70.8 cand/S1, recall 0.9864.
-- 00:58 train blocking + stage-1: India 60.8M -> 9.9M pairs (11.2/S1), US 94.9M -> 14.6M (11.0/S1).
-  **Recall after stage-1 on the 300k model sample: 0.9819 at ~11 cand/S1** (exp05: 0.9756 at 30/S1).
-- 01:04 **exp09 OOF 0.9795** (India 0.9763, US 0.9817) vs exp06 0.9771 → +0.0024. Params t1=0.70 t2=0.74 r=0.
-- 01:41 exp09 test written: 20.6M candidate pairs = **11.9 cand/S1** (France 16.7, India 11.6, US 10.4; was 29.5).
-  Validator PASS, sanity PASS (empty 0.056; France 0.055 / 3.28 matches per row). **Packaged as submissions/day2_best**.
-- 01:41 crowd_eval started (A/B of crowded training, 120k S1, 3 folds).
-- 02:08 **crowd A/B (dev/crowd_eval.py, 120k S1, 3 folds, exp06-era narrow blocking)**:
-  model A (normal training) — normal val 0.9758, **crowded val 0.9710** (−0.0048: density shift hurts);
-  model B (trained with +50% synthetic fake branches) — normal val 0.9743, **crowded val 0.9741** (+0.0031 vs A).
-  Test is crowded (US +54%, IN +38% branch-like, France ≫) → **use crowd training**. B tunes stricter t1 (0.82 vs 0.76).
-- 02:10 exp10 launched = exp09 + `--crowd 0.5` (test candidates reused from exp09 cache).
-- 03:01 **exp10 OOF 0.9789** (IN .9756 US .9811) under CROWDED train conditions (+50% synthetic branches);
-  recall after stage-1 0.9811 at 12 cand/S1. exp09 0.9795 was measured under normal conditions; the A/B implies an
-  exp09-type model loses ~0.005 under crowding (→ ~0.975), so exp10 is expected ~+0.004 better on test.
-- 03:05 queued exp11 (exp10 config, sample-seed 1, 400k S1) for a blend.
-- 03:11 exp10 test written (11.9 cand/S1, validator+sanity PASS). vs exp09 on test: France +31k/−6k pairs,
-  India +22k/−13k, US +20k/−17k. France dropped pairs are branch-like (house diff 58%, branch_sig 44%); added pairs
-  are same-address (same house 76%) with a swapped generic word (e.g. "Forge Sport SARL" -> "Forge Parents SARL") —
-  in train such swaps are 98% true matches. => France loss was partly RECALL; crowd training recovers it.
-  **day2_best := exp10** (exp09 kept as submissions/day2_exp09_wide).
-- 03:30 exp11 (exp10 config, seed+1, 400k S1) crowded OOF 0.9794 (IN .9761 US .9816).
-- 03:42 blend 0.5·exp10 + 0.5·exp11 on the 54k common OOF S1: 0.97935 (exp10 0.97887, exp11 0.97907).
-  Validator+sanity PASS. **day2_best := blend_10_11** (t1 .70 t2 .72 r 0; 11.9 cand/S1).
-- 03:44 exp12 launched (seed+2, 400k S1, crowd 0.5) for a 3-way blend.
-- 04:00 exp12 (seed+2, 400k S1) crowded OOF 0.9792. Pairwise common-OOF blend 11+12: 0.98016 (singles 0.97984/0.97978).
-- 04:15 **3-way blend exp10+exp11+exp12 (equal weights, t1 .70 t2 .72 r 0)** validator+sanity PASS, 11.9 cand/S1
-  → **day2_best := day2_blend3**. Alternatives kept: day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide (non-crowd).
-- 04:16 running crowd A/B with COUNTRY folds (unseen-country check for crowd training) → runs/crowd_eval_country.log.
-- 04:29 **crowd A/B with COUNTRY folds** (train one country, validate the other; 120k S1): A normal 0.9622 /
-  A crowded 0.9584; **B normal 0.9605 / B crowded 0.9601 (+0.0017 vs A)** → crowd training also helps on an unseen,
-  crowded country (the France situation), smaller than seen-country gain (+0.0031).
-- 04:31 exp13 launched: crowd 0.5, seed+3, **800k S1** (more data) → to join the blend.
-- 05:01 **exp13 (crowd 0.5, 800k S1, seed+3) OOF 0.9804** (IN .9776 US .9822), logloss 0.0253 (vs ~0.027 at
-  300-400k) → more data helps. Pairwise on common S1: exp13 alone ≥ any 50/50 blend with a 300-400k model
-  (vs exp10 0.98018 vs best blend 0.98011; vs exp11 0.98044 = 0.98044; vs exp12 0.98026 vs 0.98031 at w=0.7).
-- 05:16 **day2_best := 0.7·exp13 + 0.3·blend(10,11,12)**, params t1=.72 t2=.72 r=0 (exp13 OOF), validator+sanity
-  PASS, 11.9 cand/S1, empty 0.056 (France 0.052, 3.39 matches/row). Also packaged: day2_exp13 (exp13 alone).
-- 05:17 exp14 launched (crowd 0.5, 800k S1, seed+4) → blend with exp13 if it helps on common OOF.
-- 05:46 exp14 (crowd 0.5, 800k S1, seed+4) OOF 0.9800 (IN .9773 US .9819).
-- 05:57 **blend exp13+exp14 on 290k common OOF S1: 0.98040** (singles 0.98014 / 0.98012; t1 .74 t2 .70 r 0).
-  Validator+sanity PASS → **day2_best := day2_blend_13_14**. Previous 0.7/0.3 version kept as day2_final.
-- 06:00 exp15 launched (crowd 0.5, 800k S1, seed+5) for a possible 3-way big-model blend.
-- 06:27 exp15 (crowd 0.5, 800k S1, seed+5) OOF ≈0.9802 (IN .9774 US .9822).
-- 06:42 3-way evaluation on 105k common S1 (dev/blend3_eval.py): singles 0.98008/0.98008/0.98011, pairs
-  0.98028-0.98035, **3-way 0.98041** (t1 .72 t2 .70 r 0).
-- 06:45 **day2_best := day2_blend_13_14_15** — validator+sanity PASS, 11.9 cand/S1, empty 0.056
-  (France 0.051 / 3.40 matches per row, India 0.059 / 3.33, US 0.055 / 3.45).
+| day/slot | folder | content | public | what we learned |
+|---|---|---|---|---|
+| 1/1 | day1_1 | exp01 rule | 0.679 | val split optimistic |
+| 1/2 | day1_2 | exp04 | 0.955 | |
+| 1/3 | day1_3_probe | exp04, France emptied | 0.831 | US+IN 0.969, France 0.877 |
+| 1/4 | day1_4 | exp05 | 0.963 | |
+| 1/5 | day1_5_final | 0.5·exp06 + 0.5·exp07 | 0.964 | |
+| 2/1 | day2_best | blend exp13/14/15 | 0.966 | |
+| 2/2 | day2_exp17_probe_france | exp17, France emptied | 0.836 | **US+IN 0.9745** |
+| 2/3 | day2_Aprime | exp17 − French house-diff pairs | **0.969** | **France 0.938** |
+| 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | *pending* | C − 0.969 = US effect |
 
-### Day 2 morning analysis (26 Sep ~10:30)
-- exp13 OOF loss (0.0196): recall-only 0.0115 (40% blocking-caused), non-singleton empty 0.0039, has-FP 0.0027,
-  singleton-FP 0.0014. True pairs missed: blocking 52k (1.9%), **model 76k (2.7%)**; FP pairs 11k.
-- Model-missed true pairs: **64% are EMPTY-ADDRESS copies with an (almost) exact name** ("Enix LLC | (no address)"
-  p=0.10), 7% random-looking names at the S1's exact full address ("Korzeta | 120 Franklin St"), 25% similar but
-  rejected (house-number noise), 2% native script, 2% domains. 97% of these S1s still get ≥1 correct prediction.
-- Cause: candidate-side competition used only blocking cosines, which ignore names when the address is empty.
-- **exp16** (launched 11:06) = exp13 setup (crowd 0.5, seed+3, 800k S1 → identical OOF sample) + candidate-side
-  context on name token-set / compact-name ratio / address token-set for ALL candidate pairs, + exact-address
-  duplicate counts (s1_addr_dup, cand_addr_dup). Compare directly with exp13 OOF 0.9804.
-
-### Day 2 EDA (26 Sep 11:00-12:00) — senior's advice: EDA over architecture; no submissions without clear evidence
-- day2_1 public: **day2_best = 0.966** (local 0.9804) → gap stays ~0.014 (0.9769→0.963, 0.9773→0.964, 0.9804→0.966).
-- France by eye (dev/…frlook): accepted French matches look correct; predicted-count distribution per S1 is the same
-  in FR/IN/US. France misses = random names / acronyms at exact address, typo'd names with empty address.
-- **Record-type EDA (dev/eda_types.py)**: type frequencies test ≈ train for US/IN (empty addr ~14-17 per 100 S1 in all
-  countries); France has 10-20× more ACRONYM records (9.2 vs 0.5-1.1 per 100 S1).
-  Model recall by type (exp13 OOF): **empty address 0.544** (3.9% of true pairs) vs 0.99 for every other type
-  (null/## addr 0.992, native 0.991, domain 0.991, acronym 0.986, random name 0.969).
-- **Empty-address EDA (dev/eda_empty.py)**: empty-address candidate pairs are 96% negatives. Exact core name shared by
-  1 S1 → P(true) .970 (recall .99, solved); shared by 2 → .465 (recall .07); 3 → .31; ≥4 → .02. Model is rational:
-  ties between S1 with the same core name. **Raw-name (legal+punctuation kept) similarity breaks 58% of answerable
-  ties, winner correct 78%**. 85% of S1 have no empty-address copy, 14% one, 1% two.
-- **House-number EDA (dev/eda_house.py)**: equal 69.6% of true pairs (P .715); **digit drop/add (3432→432, 302→30)
-  4.6% of true pairs, P(true) .458**; same-length shift ≤30 (branch) P .067; one digit changed P .40.
-  Old features only saw numeric |diff| → digit drops looked like unrelated numbers.
-- exp16 (cand-side name/address competition): OOF 0.9807 vs exp13 0.9804 (same sample), logloss .0253→.0247;
-  empty-address recall only .544→.550 (as EDA predicted: core-name ties need raw names); other recall .9895→.9904.
-- exp17 (launched 11:50): exp16 + raw-name pair features (raw_ratio/tsort/exact) + raw-name candidate competition
-  + digit-level house relation (substr, digit Levenshtein, length diff, same length). Same sample as exp13/16.
-
-### Day 2 EDA, continued (12:00-12:40)
-- exp17 (raw-name + digit-level house features) **OOF 0.98146** vs exp16 0.98067 vs exp13 0.98036 (same sample);
-  logloss .0253→.0247→.0233; **FP pairs −18% (11,597→9,500)**; empty-address recall unchanged (.546) — remaining
-  empty-address misses are genuine ties (raw-name winner only 78% right, below the F0.5 break-even).
-- France-specific EDA (dev/eda_france.py, eda_acronym.py): S1 sharing exact address FR 12.0% vs US/IN 4-5.6%
-  (co-located S1 score .975 vs .981 in train → ≤0.001 effect); name sharing FR 52% ≈ IN 53%; empty-addr names shared
-  by 4+ S1: FR 28% vs IN 20% / US 12%; French acronyms = S1 initials at same number accepted 95.5% (US 99.6%).
-  Blocking-score saturation: FR 1.21 candidates/S1 at sim≥.999 vs ~0.4 (clean French copies), no cross-S1 ties.
-- Train vs test blocking similarity distributions (US/IN) match → no IDF/max_df shift problem.
-- Test's extra pool (~1.0 record/S1) is almost all LOW similarity: claimed records with best sim ≥0.8 per S1
-  train→test US 1.66→1.78, IN 2.14→2.34. ⇒ density shift is small where it matters.
-- Conclusion: every label-free check says US/IN test ≈ train; the constant ~0.014 gap most likely sits in France
-  (≈0.90 would explain it). Only a probe (France emptied) can confirm. exp18/exp19 (exp17 features, seeds 4/5)
-  queued for a blend.
-
-- 13:42 packaged `submissions/day2_exp17` (exp17 alone; validator+sanity PASS) and
-  `submissions/day2_exp17_probe_france` (exp17 with France emptied). Reading: US+IN ≈ (P − 0.0075)/0.8502;
-  France ≈ (S − P)/0.1498 + 0.05 where S = exp17 full public score, P = probe score.
-
-- 13:55 **France probe on exp17 = 0.836** → US+India public ≈ (0.836−0.0075)/0.8502 = **0.9745** (exp17 local US/IN
-  ≈0.981 → gap ≈0.006). France ≈ (S−0.836)/0.1498+0.05 ≈ **0.92-0.93** for S≈0.966-0.968 (day 1: US/IN 0.969, FR 0.877).
-  ⇒ gap = France ~0.008 + US/IN ~0.005.
-- EDA (dev/eda_rejected.py): copy-like candidates REJECTED per 100 S1 — same name+same house FR 3.3 / IN 2.8 / US 1.1;
-  same name+empty addr FR 28.7 / IN 44 / US 36 (train P(true|rej) ≈0.10); same name+no number FR 2.2 / IN .4 / US .3
-  (train P(true|rej) .50-.68). ⇒ France is NOT losing much on rejected copy-like records (≤ +0.002 on FR).
-- France co-located S1 (sharing exact address): empty 5.5%, 3.33 matches (alone 4.9%, 3.46) — normal.
-- France's remaining ~0.05 deficit is not visible in label-free EDA. Final file today: blend exp17/18/19.
-- exp18 (exp17 feats, seed+4) OOF 0.9812 (vs exp14 0.9800 same sample). Blend 17+18 on 290k common S1: 0.98151
-  (old 13+14 blend on same S1: 0.98040).
-
-- 14:30 exp19 (exp17 feats, seed+5) OOF 0.9814. **Blend exp17/18/19 on the same 105,677 common S1 as the old
-  13/14/15 blend: 0.98145 vs 0.98041 (+0.0010)**. Packaged `submissions/day2_blend_17_18_19` (fallback final).
-- **14:31 ADVERSARIAL VALIDATION (dev/adversarial.py)** — classifier separating train pairs from test pairs:
-  * **France AUC 0.998**. Top shifted: ctx_ad_ts_sim_n_close 4.0→7.5, **xtok_sum 2.14→0.36, xtok_max 1.67→0.36**,
-    ctx_n_cand_s1 13.9→17.5, addr_tsort 57→70, n_cand_house_eq_s1 3.5→4.7.
-    ⇒ the LEARNED branch-word encoding (our #2 feature) is BLIND in France: French branch words (Participations,
-    Développement…) never occur in train labels → xtok≈0 → model reads "no branch word" → accepts French fake
-    branches. The unseen-country simulator missed this because US and India share ENGLISH branch words.
-  * **US AUC 0.904**: s1_name_dup 35→19, cand_name_dup 34→16, ctx_*_n_s1_for_cand 46→38 — size-dependent counts
-    (US test has half the S1 of US train). India AUC 0.884 (sizes similar; smaller shifts).
-- 14:36 **exp20** launched = exp17 − xtok_* (rely on label-free hmis) + clip size-dependent counts at 10
-  (name/addr dup counts, n_s1_for_cand). Same sample (seed+3, 800k S1).
-
-- 14:50 label-free hmis detector on TEST France: holding .99, international .99, distribution .99,
-  participations .99, developpement .83, groupe .82 (branch words) vs associes .17, services .24, fils .22 (noise).
-- **exp17 accepted pairs whose candidate ADDS a branch word: France 23,364 (9.0 per 100 S1, 2.6% of French
-  accepted) vs US 0, India 20.** Examples: "Resident & Fils SCI | 48 …" ← "Resident & Fils Développement SCI | N°53 …";
-  "HM Residence SAS | 30 Rue des Lilas" ← "HM RÉSIDENCE DÉVELOPPEMENT SAS | NO 32 …". ⇒ confirmed France-only FP
-  source from the blind xtok feature; est. −0.018 France / −0.003 overall (more if French singletons are hit).
-
-- 15:35 exp20 (−xtok, clipped counts) OOF 0.9813 (exp17 0.98146). On test France: branch-word acceptances 23,364 → 839,
-  but it removed 59,868 French pairs of which **67% had the SAME house number** (swapped generic word, e.g.
-  "4l Ecole SARL" → "4l Amicale Sarl") → likely true copies lost (hmis is polluted in dense France streets).
-  ⇒ exp20's France predictions NOT used. (Idea "A" = exp17 US/IN + exp20 France was built but not submitted.)
-- **Key France fact (EDA): French true copies carry (almost) no house-number noise** — accepted digit-drop pairs
-  FR 1.05 vs US/IN ~20 per 100 S1; house-diff share of accepted pairs FR 4.4% vs US 14.4% / IN 19.7%.
-  Fake branches always shift the number ⇒ French house-diff acceptances ≈ fake branches.
-- **day2_3 submitted: Aprime = exp17 minus the 39,575 French accepted pairs whose first house number differs
-  → public 0.969** (best). Exact France score = (0.969−0.836)/0.1498+0.05 ≈ **0.938** (up ~+0.013).
-  Decomposition now: US+IN 0.9745 (85%), France 0.938 (15%).
-- Sibling tie-break for empty-address ties FAILS (winner correct 31-38%) → copies are generated independently
-  from the S1; those ties are genuinely unresolvable.
-- **Bug fix (exp21): 5-digit US house numbers were parsed as postcodes** → house_numbers empty for 8.9% of US S1 /
-  6.3% of US pool (US addresses contain essentially no ZIP). New rule: postcode only when a comma component on its
-  own, a trailing "STATE 12345", or a 6-digit PIN that is not the first number. **exp21 OOF 0.9817**
-  (IN .9785 US .9838; exp20 US .9831).
-- Plan: day2_4 = "B" = exp21 US/IN + Aprime France rows → B − 0.969 = exact effect of the US fixes.
-
-- 16:40 Apples-to-apples (corrected house parsing): accepted "small shift 1-30, same street" pairs per 100 S1 —
-  US train OOF 3.68 (prec .978) vs **US test 9.89**; India 5.87 (.992) vs 6.88; house-diff any: US 40.7 vs 49.3.
-  ⇒ ~6 extra US acceptances/100 S1 on test; if fake branches this explains the US+IN gap (0.9745 vs ~0.981).
-  Train labels: small shifts on strong candidates are TRUE 70% (US) / 91% (IN) of the time — no clean local signal.
-  "Shared shifted number" and a robust street-number parser did NOT separate true vs fake locally.
-- 17:10 built **day2_C** = Aprime minus 64,911 US small-shift pairs (India/France identical) → C − 0.969 = exact US
-  effect of the "US test fake branches differ only by number" hypothesis.
-
-### Morning handover (26 Sep 06:45)
-- Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
-- Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
-  density shift, bigger + bagged models). How much of the local 0.980 survives on test is the open question; the
-  local→public gap was 0.013 for exp05/06.
-- If public gain is large → next levers (§8): sibling-support / candidate-cluster features, realistic synthetic
-  branches (S1 + learned branch word + nudged number), crowd level for France (≫ density), more bags.
-- If public gain is small → re-check France (probe logic in §4) and the crowd assumption (submit day2_exp09_wide as
-  an A/B only if a slot can be spared).
-- Package deadline Day 3 18:00 IST (§8.7). Final code path to reproduce day2_best: run `run_pipeline.py --crowd 0.5
-  --model-s1 800000 --sample-seed {3,4,5}` (three runs, ~45 min each once blocking caches exist, ~100 min cold),
-  then `dev/blend.py` twice (13+14 at w=0.5, then +15 at w=2/3) with params from runs/blend_13_14_15_params.json.
+Built but not submitted: day2_exp17 (exp17 alone), day2_A_exp17usin_exp20fr, day2_blend_17_18_19, day2_exp13,
+day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide, day2_final, day2_probe_france.
+`submissions/log.md` has the running log; every folder has a NOTE.md.
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 10. Environment, rules and gotchas
+## 9. Reading the day2_C result
 
-- Apple M4 Pro, 12 cores, 24 GB RAM, no NVIDIA GPU. Python 3.12 venv `.venv/`. Libraries all permissive
-  (pandas/numpy/sklearn/scipy BSD, lightgbm MIT, rapidfuzz MIT, joblib BSD, tqdm MPL-2.0/MIT, pyarrow Apache-2.0).
-  **No unidecode (GPL)**, no external data, no network at runtime, no pretrained models used so far.
-- Hand-written dictionaries: legal forms (US/IN/FR), name abbreviations, address abbreviations (EN/IN/FR), the Indic
-  transliteration table. Learned from TRAIN only: transliteration dict, extra-token encoding. Unsupervised on each
-  dataset's own text (incl. test): IDF / max_df in blocking, hmis branch-word rates, name-duplicate counts — document
-  these in the methodology.
-- zsh does not word-split `$var` — build commands explicitly (a make-split loop once created a split named
-  "val --mode random --seed 42").
-- Read TSVs with `io_utils.read_tsv` (tab, dtype=str, keep_default_na=False, QUOTE_NONE).
-- The official validator must PASS before any upload; `sanity_check.py` must show France present.
-- Git: commits use `-c user.name="Yash Aggarwal" -c user.email=...`; tags `sub-day1-N`. `dataset/`, `splits/`,
-  `runs/`, `cache/`, `.venv/`, output TSVs are gitignored. The GitHub repo `yash4428/Amazon_ml` is PUBLIC — do not push
-  the dataset or (during the contest) consider making it private before pushing code.
+C keeps India/France rows identical to Aprime, so **C − 0.969 = exact US effect** of removing US accepted pairs whose
+house number is shifted by 1-30 on the same street (64,911 pairs, 9.8 per 100 US S1; 2,562 US S1 become empty).
+- C ≈ 0.972-0.974 → those were mostly fake branches. Next: test the same rule for India (keep US/France = C).
+- C ≈ 0.967-0.968 → they were mostly true copies with house noise; revert to Aprime and look elsewhere for the US loss.
+
+---------------------------------------------------------------------------------------------------------------
+
+## 10. Next steps (ranked)
+
+1. **Final file**: best of {Aprime, C}; if C wins, try `--shift-rule US India` as one more measured step. Consider
+   applying the rules to the exp21 run (5-digit fix) only if measured (keep other countries identical when testing).
+2. **Make the rules model-side** (for the package and for generality): train with realistic S1-derived fake branches
+   (`--s1-branches 0.5`, coded in `features.add_s1_branches`, not yet run; needs new crowded blocking, ~100 min) and
+   check on test that French house-diff / US shift acceptances fall without the post-rules.
+3. France is still ~0.94 vs ~0.975: remaining French errors are not visible label-free; candidates: French same-address
+   swapped-word pairs (are they copies or co-located businesses? an exact France-only experiment can tell), French
+   random-name / acronym records at shared addresses.
+4. Empty-address ties are ~0.004 of local loss and largely unresolvable — low priority.
+5. **Do NOT**: tune on the public LB beyond measured, hypothesis-driven steps; hand-label test; pseudo-label test
+   without asking the organisers (rule 7); add models/dependencies without asking Yash.
+
+---------------------------------------------------------------------------------------------------------------
+
+## 11. Final package checklist (Day 3, by 18:00 IST)
+
+- `output/matching_results.tsv` + `output/candidate_pairs.tsv` regenerated from code (run_pipeline + postprocess),
+  validator PASS, sanity PASS (France present, empty rates sane), matches ⊆ candidates.
+- `code/business_entity_resolution/{src/, README.md, requirements.txt}` — README must give the exact commands for the
+  chosen final (profile, seeds, postprocess flags) and runtimes.
+- `Documentation_template.md` filled: use §2-§8 of this file (data facts, generator, blocking table incl. stage-1
+  numbers and candidate size ~12/S1, features, model/CV, decision, post-rules with their measured gains, France/
+  unseen-country handling, experiment table, licences, "no external data / no network" statement, hand-written
+  dictionaries list, what was learned from train only vs unsupervised on test text).
+- Clean-room test: fresh venv, `pip install -r requirements.txt`, run the README commands, diff against `output/`.
+- Zip `<team_name>_submission.zip` (ask Yash for the team name).
+
+---------------------------------------------------------------------------------------------------------------
+
+## 12. Files and scripts
+
+- `code/business_entity_resolution/src/` — pipeline (§4). `dev/` — analysis tools:
+  `block_dev.py` (blocking table, `--crowd`), `stage1_dev*.py`, `country_cv.py`, `country_params.py`,
+  `crowd_eval.py`, `adversarial.py`, `blend.py`, `blend3_eval.py`, `expf.py`, `package.sh`, and the EDA scripts
+  `eda_types.py` (record types & recall), `eda_empty.py` (empty-address ties), `eda_house.py` (house-number relations),
+  `eda_acronym.py`, `eda_france.py`, `eda_rejected.py`, `eda_sibling.py`, `eda_accepted.py`,
+  `eda_branch_cluster.py`, `eda_street_number.py`.
+- `runs/<exp>_test/` (local only) — outputs + report per run; `runs/*.log` — run logs; `submissions/<name>/` — files +
+  NOTE.md; `reports/` — early evaluate.py dumps; `experiments.csv` — evaluate.py log (val-split era).
+
+---------------------------------------------------------------------------------------------------------------
+
+## 13. Environment, rules and gotchas
+
+- Apple M4 Pro, 12 cores, 24 GB RAM, no NVIDIA GPU (MPS only). Python 3.12 venv `.venv/`. Libraries (all
+  permissive): pandas/numpy/scikit-learn/scipy BSD, lightgbm MIT, rapidfuzz MIT, joblib BSD, tqdm MPL-2.0/MIT,
+  pyarrow Apache-2.0. **No unidecode (GPL)**, no external data, no network at runtime, **no pretrained models**.
+- Hand-written: legal forms (US/IN/FR), name and address abbreviations (EN/IN/FR), the Indic transliteration table,
+  fake-branch words for `add_s1_branches`. Learned from TRAIN labels only: transliteration dict, xtok encoding, all
+  models and thresholds. Unsupervised on each dataset's own text (incl. test): IDF/max_df, hmis rates, duplicate
+  counts, the France house-rule noise statistic (label-free). Document all of these in the methodology.
+- Organiser email (25 Sep): candidate_pairs.tsv is part of the final submission; **smaller candidate sets per S1 rank
+  higher** beyond the LB → keep the stage-1 filter (~12/S1).
+- zsh does not word-split `$var` (a loop once created a split named "val --mode random --seed 42").
+- Read TSVs only with `io_utils.read_tsv` (tab, dtype=str, keep_default_na=False, QUOTE_NONE).
+- Git commits use `-c user.name="Yash Aggarwal" -c user.email=...`; tags `sub-day1-N`. The GitHub repo
+  `yash4428/Amazon_ml` is PUBLIC — do not push the dataset; consider making it private during the contest.

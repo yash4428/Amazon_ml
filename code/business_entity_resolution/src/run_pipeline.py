@@ -255,6 +255,9 @@ def main():
                     help="skip CV; train one model with this many rounds (needs --params-from)")
     ap.add_argument("--params-from", default="", help="oof.json of a validated run (decision params)")
     ap.add_argument("--sample-seed", type=int, default=0, help="offset for the train-S1 sample seed")
+    ap.add_argument("--profile", choices=["current", "exp17"], default="current",
+                    help="exp17 = settings of the model behind the public 0.969 file (learned xtok kept, "
+                         "no count clipping, old postcode parser)")
     ap.add_argument("--s1-branches", type=float, default=0.0,
                     help="train-time augmentation v2: add a realistic fake branch for this fraction of train S1")
     ap.add_argument("--crowd", type=float, default=0.0,
@@ -264,6 +267,10 @@ def main():
     ap.add_argument("--tune-s1", type=int, default=config.TUNE_S1,
                     help="number of train S1 records used for tuning (full train pool is kept)")
     args = ap.parse_args()
+    if args.profile == "exp17":
+        config.DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio"]
+        config.COUNT_CLIP = None
+        config.REPARSE_NUMBERS = False
     np.random.seed(config.SEED)
 
     report_dir = os.path.join(args.out_dir, "report")
