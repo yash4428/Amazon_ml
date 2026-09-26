@@ -11,7 +11,7 @@ Last full rewrite: **26 Sep 2026, ~17:40 IST** (end of Day 2 work block).
 
 | item | value |
 |---|---|
-| **Best public score** | **0.970125** — `submissions/day2_C_us_shift` (exp17 + France house rule + US shift rule) |
+| **Best public score** | **0.970385** — `submissions/day2_final_v2` (3-seed blend + robust France house rule + US shift rule) |
 | Pending upload | `submissions/day2_final_v2` (blend + robust house rule + US shift); running: exp22 (reverse blocking), exp23 (+crowd 0.9) — §6c |
 | Leaderboard (26 Sep evening) | leader > 0.99, top-100 ≈ 0.985+, we are ~600th |
 | Honest local score (best model) | exp21 OOF 0.9817; exp17 OOF 0.98146 (same 800k-S1 sample) |
@@ -314,7 +314,7 @@ no_cand_ctx 0.9570, no_len 0.9626 (length feats removed).
 | 2/2 | day2_exp17_probe_france | exp17, France emptied | 0.836 | **US+IN 0.9745** |
 | 2/3 | day2_Aprime | exp17 − French house-diff pairs | **0.969** | **France 0.938** |
 | 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | **0.970125** | US +0.0036 (Aprime 0.968745) |
-| 2/5 | day2_final_v2 | 3-seed blend 17/18/19 + robust France house rule + US shift rule | *pending* | expected ≈0.9705 |
+| 2/5 | day2_final_v2 | 3-seed blend 17/18/19 + robust France house rule + US shift rule | **0.970385** | +0.00026 vs C: blend + France fix transfer, small |
 
 Built but not submitted: day2_exp17 (exp17 alone), day2_A_exp17usin_exp20fr, day2_blend_17_18_19, day2_exp13,
 day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide, day2_final, day2_probe_france.

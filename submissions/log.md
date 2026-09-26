@@ -9,3 +9,4 @@
 | day2_2 | exp17 France probe | - | - | - | 0.836 (US+IN = 0.9745) |
 | day2_3 | Aprime = exp17 minus France house-diff pairs | - | - | - | **0.968745** (France ≈ 0.938) |
 | day2_4 | C = Aprime minus US shifted-number pairs | - | - | - | **0.970125** (US +0.0036) |
+| day2_5 | day2_final_v2 = 3-seed blend 17/18/19 + robust France house rule + US shift | blend OOF 0.98145 (common S1) | - | - | **0.970385** (+0.00026 vs C) |
