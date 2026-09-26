@@ -39,6 +39,8 @@ def main():
     ap.add_argument("--house-rule", action="store_true")
     ap.add_argument("--noise-threshold", type=float, default=3.0)
     ap.add_argument("--shift-rule", nargs="*", default=[])
+    ap.add_argument("--shift-keep-only", action="store_true",
+                    help="shift rule never empties an S1: shifted pairs are dropped only if the S1 keeps a normal match")
     a = ap.parse_args()
 
     prm = tuple(json.load(open(a.params or os.path.join(a.run, "report", "oof.json")))["params"])
@@ -61,7 +63,13 @@ def main():
             if apply:
                 drop |= m & diff
     for c in a.shift_rule:
-        drop |= (cty == c) & (cf["branch_sig"].values == 1)
+        sh = (cty == c) & (cf["branch_sig"].values == 1)
+        if a.shift_keep_only:
+            # EDA 26 Sep: US S1 whose ONLY accepted matches are shifted are 91.5% true in train (0.34 vs 0.59 per
+            # 100 S1 on test) — the test excess is entirely in S1 that also have a normal match (3.34 -> 9.20).
+            normal = pd.Series(~sh & (cty == c)).groupby(pr["i"].values).transform("any").values
+            sh = sh & normal
+        drop |= sh
     print(f"  dropped {int(drop.sum())} of {len(pr)} accepted pairs")
     keep = pr[~drop]
     s1_ids = s1["entity_id"].values
@@ -71,6 +79,7 @@ def main():
     write_outputs(a.out, list(s1_ids), group_ids(keep, s1_ids, pool_ids), group_ids(t, s1_ids, pool_ids))
     with open(os.path.join(a.out, "postprocess_info.json"), "w") as f:
         json.dump({"run": a.run, "params": prm, "house_rule": a.house_rule, "shift_rule": a.shift_rule,
+                   "shift_keep_only": a.shift_keep_only,
                    "dropped": int(drop.sum())}, f, indent=2)
 
 
