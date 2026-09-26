@@ -33,6 +33,13 @@ def string_features(a, b):
         f[f"{col}_tsort"] = _pair(fuzz.token_sort_ratio, x, y)
         f[f"{col}_tset"] = _pair(fuzz.token_set_ratio, x, y)
         f[f"{col}_jw"] = _pair(distance.JaroWinkler.normalized_similarity, x, y)
+    if "name_raw" in a:
+        # raw name (lowercase, accents stripped, legal forms + punctuation KEPT): breaks ties between S1 that
+        # share a core name ("Hildy Morse, M.D." vs "Hildy Morse, M.D., PC") — EDA 26 Sep: 78% right on ties
+        x, y = a["name_raw"].tolist(), b["name_raw"].tolist()
+        f["raw_ratio"] = _pair(fuzz.ratio, x, y)
+        f["raw_tsort"] = _pair(fuzz.token_sort_ratio, x, y)
+        f["raw_exact"] = (a["name_raw"].values == b["name_raw"].values).astype(np.float32)
     x, y = a["name_compact"].tolist(), b["name_compact"].tolist()
     f["compact_ratio"] = _pair(fuzz.ratio, x, y)
     f["compact_partial"] = _pair(fuzz.partial_ratio, x, y)
@@ -114,7 +121,8 @@ def string_context_sims(cand, s1, pool, chunk=4_000_000):
     candidate-side context ask "does another S1 fit this record's NAME (or ADDRESS) better?", which the
     blocking cosines cannot answer for empty-address or random-name copies.
     """
-    out = {k: np.zeros(len(cand), np.float32) for k in ("nm_ts_sim", "cp_r_sim", "ad_ts_sim")}
+    keys = ["nm_ts_sim", "cp_r_sim", "ad_ts_sim"] + (["rw_r_sim"] if "name_raw" in s1 else [])
+    out = {k: np.zeros(len(cand), np.float32) for k in keys}
     ii, jj = cand["i"].values, cand["j"].values
     for a in range(0, len(cand), chunk):
         b = min(a + chunk, len(cand))
@@ -125,6 +133,9 @@ def string_context_sims(cand, s1, pool, chunk=4_000_000):
                                      pool["name_compact"].values[j].tolist()) / 100
         out["ad_ts_sim"][a:b] = _pair(fuzz.token_set_ratio, s1["addr_norm"].values[i].tolist(),
                                       pool["addr_norm"].values[j].tolist()) / 100
+        if "rw_r_sim" in out:
+            out["rw_r_sim"][a:b] = _pair(fuzz.ratio, s1["name_raw"].values[i].tolist(),
+                                         pool["name_raw"].values[j].tolist()) / 100
     return pd.DataFrame(out, index=cand.index)
 
 
@@ -240,6 +251,23 @@ def cluster_features(c, s1, pool):
     # S1 first number appears anywhere among candidate numbers
     out["house_s1_in_cand"] = np.array([(a != "" and a in b.split()) for a, b in zip(f1, h2)],
                                        np.float32)
+    # Digit-level relation (EDA 26 Sep): true copies often DROP/ADD a digit (3432 -> 432, 302 -> 30; P(true)=.46)
+    # while fake branches SHIFT the number at the same length (1461 -> 1466; P(true)=.07).
+    d1 = [x.lstrip("0") for x in f1]; d2 = [x.lstrip("0") for x in f2]
+    sub, lev, ldiff, slen = [], [], [], []
+    for p_, q_ in zip(d1, d2):
+        pd_ = "".join(ch for ch in p_ if ch.isdigit()); qd_ = "".join(ch for ch in q_ if ch.isdigit())
+        if not pd_ or not qd_:
+            sub.append(-1); lev.append(-1); ldiff.append(-1); slen.append(-1)
+            continue
+        sub.append(1 if (pd_ != qd_ and (pd_ in qd_ or qd_ in pd_)) else 0)
+        lev.append(distance.Levenshtein.distance(pd_, qd_))
+        ldiff.append(abs(len(pd_) - len(qd_)))
+        slen.append(1 if len(pd_) == len(qd_) else 0)
+    out["house_digit_substr"] = np.array(sub, np.float32)
+    out["house_digit_lev"] = np.array(lev, np.float32)
+    out["house_digit_lendiff"] = np.array(ldiff, np.float32)
+    out["house_same_len"] = np.array(slen, np.float32)
     # Branch signature: same street, house number nudged by a small offset (24082 -> 24090).
     small = ~np.isnan(diff) & (diff > 0) & (diff <= config_small_offset)
     out["house_small_offset"] = np.where(np.isnan(diff), -1, small).astype(np.float32)
@@ -347,3 +375,15 @@ def add_synthetic_branches(pool, truth, frac, seed=7):
     nob["business_address"] = [nudge(x, o) for x, o in zip(nob["business_address"].values, offs)]
     nob["entity_id"] = [f"SYN-{k}" for k in range(len(nob))]
     return pd.concat([pool, nob], ignore_index=True)
+
+
+def add_raw_names(df):
+    """Add ``name_raw``: lowercase, accent-stripped raw name with punctuation and legal forms kept."""
+    import unicodedata
+    import re as _re
+
+    def raw(t):
+        t = unicodedata.normalize("NFKD", t)
+        t = "".join(ch for ch in t if not unicodedata.combining(ch)).lower()
+        return _re.sub(r"\s+", " ", t).strip()
+    return df.assign(name_raw=[raw(t) for t in df["business_name"].values])

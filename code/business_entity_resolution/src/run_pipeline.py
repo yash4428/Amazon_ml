@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
-from features import (add_dup_counts, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
+from features import (add_dup_counts, add_raw_names, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
                       dup_features, encode_extras, global_context, hmis_features,
                       house_mismatch_token_rates, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
@@ -125,6 +125,8 @@ def fit_lgbm(args, report_dir):
         pool_tr = add_synthetic_branches(pool_tr, truth, args.crowd)
         log(f"crowding: train pool augmented to {len(pool_tr)} records (+{args.crowd:.0%} fake branches)")
     s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
+    if config.RAW_NAMES:
+        s1_tr, pool_tr = add_raw_names(s1_tr), add_raw_names(pool_tr)
     rng = np.random.RandomState(config.SEED + args.sample_seed)
     n_model = min(args.model_s1, len(s1_tr))
     pos = np.sort(rng.choice(len(s1_tr), n_model, replace=False))
@@ -270,6 +272,8 @@ def main():
     if args.mode == "lgbm":
         s1_te, pool_te = apply_translit_dict(s1_te, tl), apply_translit_dict(pool_te, tl)
         s1_te, pool_te = add_dup_counts(s1_te, pool_te)
+        if config.RAW_NAMES:
+            s1_te, pool_te = add_raw_names(s1_te), add_raw_names(pool_te)
     log(f"blocking test: {len(s1_te)} S1 x {len(pool_te)} pool")
     if args.mode == "lgbm" and st1 is not None:
         cand_te = blocking_cached(s1_te, pool_te, "test",
