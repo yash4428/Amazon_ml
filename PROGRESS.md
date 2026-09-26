@@ -366,6 +366,24 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   "HM Residence SAS | 30 Rue des Lilas" ← "HM RÉSIDENCE DÉVELOPPEMENT SAS | NO 32 …". ⇒ confirmed France-only FP
   source from the blind xtok feature; est. −0.018 France / −0.003 overall (more if French singletons are hit).
 
+- 15:35 exp20 (−xtok, clipped counts) OOF 0.9813 (exp17 0.98146). On test France: branch-word acceptances 23,364 → 839,
+  but it removed 59,868 French pairs of which **67% had the SAME house number** (swapped generic word, e.g.
+  "4l Ecole SARL" → "4l Amicale Sarl") → likely true copies lost (hmis is polluted in dense France streets).
+  ⇒ exp20's France predictions NOT used. (Idea "A" = exp17 US/IN + exp20 France was built but not submitted.)
+- **Key France fact (EDA): French true copies carry (almost) no house-number noise** — accepted digit-drop pairs
+  FR 1.05 vs US/IN ~20 per 100 S1; house-diff share of accepted pairs FR 4.4% vs US 14.4% / IN 19.7%.
+  Fake branches always shift the number ⇒ French house-diff acceptances ≈ fake branches.
+- **day2_3 submitted: Aprime = exp17 minus the 39,575 French accepted pairs whose first house number differs
+  → public 0.969** (best). Exact France score = (0.969−0.836)/0.1498+0.05 ≈ **0.938** (up ~+0.013).
+  Decomposition now: US+IN 0.9745 (85%), France 0.938 (15%).
+- Sibling tie-break for empty-address ties FAILS (winner correct 31-38%) → copies are generated independently
+  from the S1; those ties are genuinely unresolvable.
+- **Bug fix (exp21): 5-digit US house numbers were parsed as postcodes** → house_numbers empty for 8.9% of US S1 /
+  6.3% of US pool (US addresses contain essentially no ZIP). New rule: postcode only when a comma component on its
+  own, a trailing "STATE 12345", or a 6-digit PIN that is not the first number. **exp21 OOF 0.9817**
+  (IN .9785 US .9838; exp20 US .9831).
+- Plan: day2_4 = "B" = exp21 US/IN + Aprime France rows → B − 0.969 = exact effect of the US fixes.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
