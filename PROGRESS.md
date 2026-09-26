@@ -316,6 +316,21 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - exp17 (launched 11:50): exp16 + raw-name pair features (raw_ratio/tsort/exact) + raw-name candidate competition
   + digit-level house relation (substr, digit Levenshtein, length diff, same length). Same sample as exp13/16.
 
+### Day 2 EDA, continued (12:00-12:40)
+- exp17 (raw-name + digit-level house features) **OOF 0.98146** vs exp16 0.98067 vs exp13 0.98036 (same sample);
+  logloss .0253→.0247→.0233; **FP pairs −18% (11,597→9,500)**; empty-address recall unchanged (.546) — remaining
+  empty-address misses are genuine ties (raw-name winner only 78% right, below the F0.5 break-even).
+- France-specific EDA (dev/eda_france.py, eda_acronym.py): S1 sharing exact address FR 12.0% vs US/IN 4-5.6%
+  (co-located S1 score .975 vs .981 in train → ≤0.001 effect); name sharing FR 52% ≈ IN 53%; empty-addr names shared
+  by 4+ S1: FR 28% vs IN 20% / US 12%; French acronyms = S1 initials at same number accepted 95.5% (US 99.6%).
+  Blocking-score saturation: FR 1.21 candidates/S1 at sim≥.999 vs ~0.4 (clean French copies), no cross-S1 ties.
+- Train vs test blocking similarity distributions (US/IN) match → no IDF/max_df shift problem.
+- Test's extra pool (~1.0 record/S1) is almost all LOW similarity: claimed records with best sim ≥0.8 per S1
+  train→test US 1.66→1.78, IN 2.14→2.34. ⇒ density shift is small where it matters.
+- Conclusion: every label-free check says US/IN test ≈ train; the constant ~0.014 gap most likely sits in France
+  (≈0.90 would explain it). Only a probe (France emptied) can confirm. exp18/exp19 (exp17 features, seeds 4/5)
+  queued for a blend.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
