@@ -359,6 +359,13 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
 - 14:36 **exp20** launched = exp17 − xtok_* (rely on label-free hmis) + clip size-dependent counts at 10
   (name/addr dup counts, n_s1_for_cand). Same sample (seed+3, 800k S1).
 
+- 14:50 label-free hmis detector on TEST France: holding .99, international .99, distribution .99,
+  participations .99, developpement .83, groupe .82 (branch words) vs associes .17, services .24, fils .22 (noise).
+- **exp17 accepted pairs whose candidate ADDS a branch word: France 23,364 (9.0 per 100 S1, 2.6% of French
+  accepted) vs US 0, India 20.** Examples: "Resident & Fils SCI | 48 …" ← "Resident & Fils Développement SCI | N°53 …";
+  "HM Residence SAS | 30 Rue des Lilas" ← "HM RÉSIDENCE DÉVELOPPEMENT SAS | NO 32 …". ⇒ confirmed France-only FP
+  source from the blind xtok feature; est. −0.018 France / −0.003 overall (more if French singletons are hit).
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
