@@ -384,6 +384,14 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   (IN .9785 US .9838; exp20 US .9831).
 - Plan: day2_4 = "B" = exp21 US/IN + Aprime France rows → B − 0.969 = exact effect of the US fixes.
 
+- 16:40 Apples-to-apples (corrected house parsing): accepted "small shift 1-30, same street" pairs per 100 S1 —
+  US train OOF 3.68 (prec .978) vs **US test 9.89**; India 5.87 (.992) vs 6.88; house-diff any: US 40.7 vs 49.3.
+  ⇒ ~6 extra US acceptances/100 S1 on test; if fake branches this explains the US+IN gap (0.9745 vs ~0.981).
+  Train labels: small shifts on strong candidates are TRUE 70% (US) / 91% (IN) of the time — no clean local signal.
+  "Shared shifted number" and a robust street-number parser did NOT separate true vs fake locally.
+- 17:10 built **day2_C** = Aprime minus 64,911 US small-shift pairs (India/France identical) → C − 0.969 = exact US
+  effect of the "US test fake branches differ only by number" hypothesis.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
