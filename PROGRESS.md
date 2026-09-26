@@ -331,6 +331,10 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   (≈0.90 would explain it). Only a probe (France emptied) can confirm. exp18/exp19 (exp17 features, seeds 4/5)
   queued for a blend.
 
+- 13:42 packaged `submissions/day2_exp17` (exp17 alone; validator+sanity PASS) and
+  `submissions/day2_exp17_probe_france` (exp17 with France emptied). Reading: US+IN ≈ (P − 0.0075)/0.8502;
+  France ≈ (S − P)/0.1498 + 0.05 where S = exp17 full public score, P = probe score.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
