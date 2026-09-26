@@ -335,6 +335,17 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   `submissions/day2_exp17_probe_france` (exp17 with France emptied). Reading: US+IN ≈ (P − 0.0075)/0.8502;
   France ≈ (S − P)/0.1498 + 0.05 where S = exp17 full public score, P = probe score.
 
+- 13:55 **France probe on exp17 = 0.836** → US+India public ≈ (0.836−0.0075)/0.8502 = **0.9745** (exp17 local US/IN
+  ≈0.981 → gap ≈0.006). France ≈ (S−0.836)/0.1498+0.05 ≈ **0.92-0.93** for S≈0.966-0.968 (day 1: US/IN 0.969, FR 0.877).
+  ⇒ gap = France ~0.008 + US/IN ~0.005.
+- EDA (dev/eda_rejected.py): copy-like candidates REJECTED per 100 S1 — same name+same house FR 3.3 / IN 2.8 / US 1.1;
+  same name+empty addr FR 28.7 / IN 44 / US 36 (train P(true|rej) ≈0.10); same name+no number FR 2.2 / IN .4 / US .3
+  (train P(true|rej) .50-.68). ⇒ France is NOT losing much on rejected copy-like records (≤ +0.002 on FR).
+- France co-located S1 (sharing exact address): empty 5.5%, 3.33 matches (alone 4.9%, 3.46) — normal.
+- France's remaining ~0.05 deficit is not visible in label-free EDA. Final file today: blend exp17/18/19.
+- exp18 (exp17 feats, seed+4) OOF 0.9812 (vs exp14 0.9800 same sample). Blend 17+18 on 290k common S1: 0.98151
+  (old 13+14 blend on same S1: 0.98040).
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
