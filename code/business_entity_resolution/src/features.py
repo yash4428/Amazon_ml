@@ -394,3 +394,42 @@ def add_raw_names(df):
         t = "".join(ch for ch in t if not unicodedata.combining(ch)).lower()
         return _re.sub(r"\s+", " ", t).strip()
     return df.assign(name_raw=[raw(t) for t in df["business_name"].values])
+
+
+def add_s1_branches(pool, s1, frac, seed=11):
+    """Training-time augmentation v2 (EDA 26 Sep): realistic fake branches built FROM S1 records.
+
+    Test accepts 2.75x more "same street, house number shifted" pairs than train (US), and French copies keep
+    their house numbers, so real fake branches = the S1's own name + a shifted number. For a random ``frac`` of
+    S1 we add one pool record: S1 name (half the time + a branch word), first house number shifted by 1-30
+    (length kept when possible), address otherwise identical, S2-style (UPPER) or S3-style (as is) casing.
+    These records are never matches (train only)."""
+    import re
+    rs = np.random.RandomState(seed)
+    pick = rs.rand(len(s1)) < frac
+    src = s1[pick]
+    words = ["Holdings", "Group", "Ventures", "East", "West", "North", "South", "Downtown", "Partners",
+             "Associates", "Solutions", "Services", "International", "Enterprises"]
+    names, addrs = [], []
+    for n, a in zip(src["business_name"].values, src["business_address"].values):
+        m = re.search(r"\d+", a)
+        if not m:
+            names.append(None); addrs.append(None); continue
+        v = int(m.group()); nv = v + int(rs.randint(1, 31)) * (1 if v < 30 or rs.rand() < 0.7 else -1)
+        nv = max(nv, 1)
+        a2 = a[:m.start()] + str(nv) + a[m.end():]
+        n2 = n + " " + words[rs.randint(len(words))] if rs.rand() < 0.5 else n
+        if rs.rand() < 0.5:
+            n2, a2 = n2.upper(), a2.upper()
+        names.append(n2); addrs.append(a2)
+    keep = np.array([x is not None for x in names])
+    new = pd.DataFrame({"entity_id": [f"SYB-{k}" for k in range(int(keep.sum()))],
+                        "business_name": [x for x in names if x is not None],
+                        "business_address": [x for x in addrs if x is not None],
+                        "country": src["country"].values[keep], "src": rs.choice([2, 3], int(keep.sum()))})
+    from normalize import normalize_frame
+    new = normalize_frame(new, n_jobs=config.N_JOBS)
+    for col in pool.columns:
+        if col not in new.columns:
+            new[col] = "" if pool[col].dtype == object else 0
+    return pd.concat([pool, new[pool.columns]], ignore_index=True)

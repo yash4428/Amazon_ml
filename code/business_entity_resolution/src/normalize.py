@@ -436,3 +436,55 @@ def apply_translit_dict(df, mapping):
     df.loc[m, "name_compact"] = compact
     df.loc[m, "acronym"] = acro
     return df
+
+
+# --------------------------------------------------------------------------
+# Number re-parsing (bug fix, 26 Sep): the original parser treated ANY standalone 5-6 digit number as a
+# postcode, so 5-digit US house numbers ("12835 175TH AVENUE") were dropped from house_numbers (8.9% of US
+# S1, 6.3% of US pool). US addresses here contain essentially no ZIP codes. A number is now a postcode only
+# when it is a comma-separated component on its own ("…, 44800, …"), or a 6-digit (Indian PIN) number that is
+# not the first number of the address.
+# --------------------------------------------------------------------------
+_PC_ALONE = re.compile(r"^\s*[#(]?\s*(\d{5,6}(?:-\d{4})?|\d{3}\s\d{3})\s*[).]?\s*$")
+_NUM6 = re.compile(r"(?<![\d/-])(\d{6})(?![\d/-])")
+_PC_TAIL = re.compile(r"[a-z][a-z .]*\s(\d{5})(?:-\d{4})?\s*\.?\s*$")   # "…, il 62301" (state + ZIP at the end)
+_FIRST_NUM = re.compile(r"\d+")
+
+
+def parse_numbers(raw):
+    """Return (postcode, house_numbers) for one raw address string with the corrected postcode rule."""
+    t = base_clean(raw)
+    t = t.replace("n°", " no ").replace("nº", " no ")
+    comps = t.split(",")
+    postcode = ""
+    for comp in reversed(comps):
+        m = _PC_ALONE.match(comp)
+        if m:
+            postcode = m.group(1).replace(" ", "").split("-")[0]
+            break
+    if not postcode:
+        m = _PC_TAIL.search(comps[-1])
+        if m:
+            postcode = m.group(1)
+    houses = [h.lstrip("0") or "0" for h in _HOUSE_RE.findall(t)]
+    if not postcode:
+        six = _NUM6.findall(t)
+        first = _FIRST_NUM.search(t)
+        if six and not (first and first.group() == six[-1]):
+            postcode = six[-1]
+    houses = [h for h in houses if h != postcode.lstrip("0")]
+    return postcode, " ".join(dict.fromkeys(houses))
+
+
+def _parse_block(addrs):
+    """parse_numbers over a list of raw addresses (joblib worker)."""
+    out = [parse_numbers(a) for a in addrs]
+    return [o[0] for o in out], [o[1] for o in out]
+
+
+def reparse_numbers(df, n_jobs=1, block=500_000):
+    """Recompute ``postcode`` and ``house_numbers`` for a normalised frame with the corrected rule."""
+    from joblib import Parallel, delayed
+    a = df["business_address"].tolist()
+    res = Parallel(n_jobs=n_jobs)(delayed(_parse_block)(a[i:i + block]) for i in range(0, len(a), block))
+    return df.assign(postcode=[p for r in res for p in r[0]], house_numbers=[h for r in res for h in r[1]])

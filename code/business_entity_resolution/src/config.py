@@ -28,6 +28,7 @@ TUNE_S1 = 300_000             # train S1 sampled for threshold tuning (full trai
 # ---------------------------------------------------------------- model
 MODEL_S1 = 300_000            # train S1 records used to fit the pair model (sampled, seeded)
 USE_XTOK = True               # learned extra-name-token encoding feature
+REPARSE_NUMBERS = True        # exp21: 5-digit US house numbers were parsed as postcodes (bug fix)
 RAW_NAMES = True              # raw-name pair features + raw-name competition (exp17)
 CTX_STRINGS = True            # candidate-side context on name/address string sims (exp16)
 USE_TRANSLIT_DICT = True      # learned Indic-transliteration -> English token map (train pairs)

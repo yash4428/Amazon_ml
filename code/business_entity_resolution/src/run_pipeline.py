@@ -20,13 +20,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config  # noqa: E402
 from blocking import generate_candidates  # noqa: E402
 from decide import apply_rule, tune_rule  # noqa: E402
-from features import (add_dup_counts, add_raw_names, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
+from features import (add_dup_counts, add_raw_names, add_s1_branches, add_synthetic_branches, chunk_features, cluster_features,  # noqa: E402
                       dup_features, encode_extras, global_context, hmis_features,
                       house_mismatch_token_rates, pair_extras, token_counts)
 from model import group_folds, predict, train_full, train_oof  # noqa: E402
 from stage1 import prune, stage1_features, train_stage1  # noqa: E402
 from io_utils import read_truth, write_outputs  # noqa: E402
-from normalize import apply_translit_dict, build_translit_dict, load_normalized  # noqa: E402
+from normalize import apply_translit_dict, build_translit_dict, load_normalized, reparse_numbers  # noqa: E402
 
 
 def log(msg):
@@ -124,6 +124,14 @@ def fit_lgbm(args, report_dir):
     if args.crowd > 0:
         pool_tr = add_synthetic_branches(pool_tr, truth, args.crowd)
         log(f"crowding: train pool augmented to {len(pool_tr)} records (+{args.crowd:.0%} fake branches)")
+    if args.s1_branches > 0:
+        n0 = len(pool_tr)
+        pool_tr = add_s1_branches(pool_tr, s1_tr, args.s1_branches)
+        log(f"S1-derived fake branches: +{len(pool_tr) - n0} records (frac {args.s1_branches})")
+    if config.REPARSE_NUMBERS:
+        s1_tr = reparse_numbers(s1_tr, n_jobs=config.N_JOBS)
+        pool_tr = reparse_numbers(pool_tr, n_jobs=config.N_JOBS)
+        log("re-parsed postcodes / house numbers (5-digit US house-number fix)")
     s1_tr, pool_tr = add_dup_counts(s1_tr, pool_tr)
     if config.RAW_NAMES:
         s1_tr, pool_tr = add_raw_names(s1_tr), add_raw_names(pool_tr)
@@ -247,6 +255,8 @@ def main():
                     help="skip CV; train one model with this many rounds (needs --params-from)")
     ap.add_argument("--params-from", default="", help="oof.json of a validated run (decision params)")
     ap.add_argument("--sample-seed", type=int, default=0, help="offset for the train-S1 sample seed")
+    ap.add_argument("--s1-branches", type=float, default=0.0,
+                    help="train-time augmentation v2: add a realistic fake branch for this fraction of train S1")
     ap.add_argument("--crowd", type=float, default=0.0,
                     help="train-time augmentation: add this fraction of synthetic fake branches to the train pool")
     ap.add_argument("--oof-only", action="store_true",
@@ -271,6 +281,9 @@ def main():
     s1_te, pool_te = load_normalized(args.test_dir, "test", n_jobs=config.N_JOBS)
     if args.mode == "lgbm":
         s1_te, pool_te = apply_translit_dict(s1_te, tl), apply_translit_dict(pool_te, tl)
+        if config.REPARSE_NUMBERS:
+            s1_te = reparse_numbers(s1_te, n_jobs=config.N_JOBS)
+            pool_te = reparse_numbers(pool_te, n_jobs=config.N_JOBS)
         s1_te, pool_te = add_dup_counts(s1_te, pool_te)
         if config.RAW_NAMES:
             s1_te, pool_te = add_raw_names(s1_te), add_raw_names(pool_te)
