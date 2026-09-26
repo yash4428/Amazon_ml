@@ -296,6 +296,26 @@ TSV outputs are gitignored (large); NOTE.md files in each submission folder reco
   context on name token-set / compact-name ratio / address token-set for ALL candidate pairs, + exact-address
   duplicate counts (s1_addr_dup, cand_addr_dup). Compare directly with exp13 OOF 0.9804.
 
+### Day 2 EDA (26 Sep 11:00-12:00) — senior's advice: EDA over architecture; no submissions without clear evidence
+- day2_1 public: **day2_best = 0.966** (local 0.9804) → gap stays ~0.014 (0.9769→0.963, 0.9773→0.964, 0.9804→0.966).
+- France by eye (dev/…frlook): accepted French matches look correct; predicted-count distribution per S1 is the same
+  in FR/IN/US. France misses = random names / acronyms at exact address, typo'd names with empty address.
+- **Record-type EDA (dev/eda_types.py)**: type frequencies test ≈ train for US/IN (empty addr ~14-17 per 100 S1 in all
+  countries); France has 10-20× more ACRONYM records (9.2 vs 0.5-1.1 per 100 S1).
+  Model recall by type (exp13 OOF): **empty address 0.544** (3.9% of true pairs) vs 0.99 for every other type
+  (null/## addr 0.992, native 0.991, domain 0.991, acronym 0.986, random name 0.969).
+- **Empty-address EDA (dev/eda_empty.py)**: empty-address candidate pairs are 96% negatives. Exact core name shared by
+  1 S1 → P(true) .970 (recall .99, solved); shared by 2 → .465 (recall .07); 3 → .31; ≥4 → .02. Model is rational:
+  ties between S1 with the same core name. **Raw-name (legal+punctuation kept) similarity breaks 58% of answerable
+  ties, winner correct 78%**. 85% of S1 have no empty-address copy, 14% one, 1% two.
+- **House-number EDA (dev/eda_house.py)**: equal 69.6% of true pairs (P .715); **digit drop/add (3432→432, 302→30)
+  4.6% of true pairs, P(true) .458**; same-length shift ≤30 (branch) P .067; one digit changed P .40.
+  Old features only saw numeric |diff| → digit drops looked like unrelated numbers.
+- exp16 (cand-side name/address competition): OOF 0.9807 vs exp13 0.9804 (same sample), logloss .0253→.0247;
+  empty-address recall only .544→.550 (as EDA predicted: core-name ties need raw names); other recall .9895→.9904.
+- exp17 (launched 11:50): exp16 + raw-name pair features (raw_ratio/tsort/exact) + raw-name candidate competition
+  + digit-level house relation (substr, digit Levenshtein, length diff, same length). Same sample as exp13/16.
+
 ### Morning handover (26 Sep 06:45)
 - Upload first: `submissions/day2_best/matching_results.tsv`. Record the public score in §7 and submissions/log.md.
 - Expected: clearly above 0.964 (blocking recall +0.6 pts at 1/2.5 the candidates, crowd training for the test
