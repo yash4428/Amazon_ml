@@ -1,0 +1,9 @@
+[00:18:32] loading train
+[00:20:13] learned transliteration dict: 567 tokens
+[00:20:45] crowding: train pool augmented to 12733888 records (+90% fake branches)
+  [India] reverse combo_c: 5099533 pool x 883188 S1, top-5, 25496284 pairs, 197.4s
+  [India] reverse combo: 5099533 pool x 883188 S1, top-5, 25457132 pairs, 127.6s
+  [US] reverse combo_c: 7634355 pool x 1323633 S1, top-5, 38166310 pairs, 333.5s
+  [US] reverse combo: 7634355 pool x 1323633 S1, top-5, 38122589 pairs, 171.6s
+[00:36:22] reverse blocking: 88302602 pairs
+[00:36:25] stage-1: blocking 60000 held-out train S1 for filter training

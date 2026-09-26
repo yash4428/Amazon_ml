@@ -1,0 +1,11 @@
+[14:00:05] loading train
+[14:01:16] blocking train: 300000 S1 x 4133346 pool
+  [India] combo: 300000 S1 x 4133346 pool, 5999972 pairs, 141.4s
+  [India] name_c4: 300000 S1 x 4133346 pool, 2938030 pairs, 27.7s
+[14:04:15] train candidates 8208672, pair recall 0.9368
+  tuned rule t1=0.54 t2=0.82 r=0.0 -> train macroF0.5 0.6883
+[14:04:19] loading test
+[14:05:28] blocking test: 1323633 S1 x 6186873 pool
+  [US] combo: 1323633 S1 x 6186873 pool, 26472660 pairs, 266.3s
+  [US] name_c4: 1323633 S1 x 6186873 pool, 12480296 pairs, 87.1s
+[14:12:15] wrote runs/loco_us: 2464181 matches, 34486574 candidates, empty rows 0.029

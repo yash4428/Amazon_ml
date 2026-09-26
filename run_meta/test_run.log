@@ -1,0 +1,18 @@
+[14:12:17] loading train
+[14:13:43] blocking train: 300000 S1 x 10320219 pool
+  [India] combo: 119856 S1 x 4133346 pool, 2397120 pairs, 90.8s
+  [India] name_c4: 119856 S1 x 4133346 pool, 1176654 pairs, 22.3s
+  [US] combo: 180144 S1 x 6186873 pool, 3602880 pairs, 94.9s
+  [US] name_c4: 180144 S1 x 6186873 pool, 1713576 pairs, 39.1s
+[14:18:01] train candidates 7977825, pair recall 0.9618
+  tuned rule t1=0.58 t2=0.82 r=0.0 -> train macroF0.5 0.6800
+[14:18:06] loading test
+[14:19:20] blocking test: 1732544 S1 x 9969589 pool
+  [France] combo: 259452 S1 x 1434993 pool, 5188994 pairs, 29.7s
+  [France] name_c4: 259452 S1 x 1434993 pool, 2520621 pairs, 10.5s
+  [India] combo: 809986 S1 x 4717565 pool, 16199630 pairs, 243.7s
+  [India] name_c4: 809986 S1 x 4717565 pool, 7804491 pairs, 44.2s
+  [US] combo: 663106 S1 x 3817031 pool, 13262120 pairs, 152.4s
+  [US] name_c4: 663106 S1 x 3817031 pool, 6467629 pairs, 49.6s
+[14:29:30] wrote output: 3899619 matches, 45930343 candidates, empty rows 0.024
+ALLDONE

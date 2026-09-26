@@ -1,0 +1,34 @@
+[19:15:23] loading train
+[19:16:56] learned transliteration dict: 567 tokens
+[19:17:03] blocking train: 2206821 S1 x 10320219 pool
+  [India] combo: 883188 S1 x 4133346 pool, 17663653 pairs, 222.0s
+  [India] name_c4: 883188 S1 x 4133346 pool, 8567371 pairs, 44.3s
+  [US] combo: 1323633 S1 x 6186873 pool, 26472660 pairs, 276.7s
+  [US] name_c4: 1323633 S1 x 6186873 pool, 12480296 pairs, 96.6s
+[19:31:14] model pairs 6637744 from 250000 S1, positives 835502, pair recall 0.9661
+[19:32:57] features (6637744, 64), cv=group folds=5
+  fold 0: best_iter 639, valid logloss 0.0110, 96s
+  fold 1: best_iter 538, valid logloss 0.0109, 85s
+  fold 2: best_iter 672, valid logloss 0.0111, 104s
+  fold 3: best_iter 636, valid logloss 0.0113, 89s
+  fold 4: best_iter 637, valid logloss 0.0110, 92s
+  tuned rule t1=0.74 t2=0.02 r=0.75 -> train macroF0.5 0.9736
+[19:40:48] OOF per country {'India': 0.9662, 'US': 0.9785}
+[19:40:50] training final model on all 6637744 pairs, 686 rounds
+[19:42:34] OOF tuned params (0.74, 0.02, 0.75), OOF macroF0.5 0.9736
+[19:42:34] loading test
+[19:44:08] blocking test: 1732544 S1 x 9969589 pool
+  [France] combo: 259452 S1 x 1434993 pool, 5188994 pairs, 47.3s
+  [France] name_c4: 259452 S1 x 1434993 pool, 2520621 pairs, 13.0s
+  [India] combo: 809986 S1 x 4717565 pool, 16199596 pairs, 253.3s
+  [India] name_c4: 809986 S1 x 4717565 pool, 7749413 pairs, 54.4s
+  [US] combo: 663106 S1 x 3817031 pool, 13262120 pairs, 187.3s
+  [US] name_c4: 663106 S1 x 3817031 pool, 6467629 pairs, 57.9s
+[19:59:20]   scored pairs 6619119/45862637
+[20:01:14]   scored pairs 13233245/45862637
+[20:03:03]   scored pairs 19850136/45862637
+[20:04:51]   scored pairs 26468539/45862637
+[20:06:43]   scored pairs 33088374/45862637
+[20:08:24]   scored pairs 39705092/45862637
+[20:09:55]   scored pairs 45862637/45862637
+[20:11:34] wrote runs/exp04_test: 5774212 matches, 45862637 candidates, empty rows 0.057

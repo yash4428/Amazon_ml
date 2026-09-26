@@ -1,0 +1,5 @@
+[19:01:30] loading train
+[19:02:57] blocking train: 2206821 S1 x 10320219 pool
+  [India] combo: 883188 S1 x 4133346 pool, 17663658 pairs, 276.1s
+  [India] name_c4: 883188 S1 x 4133346 pool, 8575468 pairs, 49.2s
+  [US] combo: 1323633 S1 x 6186873 pool, 26472660 pairs, 298.6s

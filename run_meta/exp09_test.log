@@ -1,0 +1,43 @@
+[00:15:50] loading train
+[00:17:18] learned transliteration dict: 567 tokens
+[00:17:26] stage-1: blocking 60000 held-out train S1 for filter training
+[00:22:55] stage-1 trained on 4250631 pairs (70.8/S1, recall 0.9864)
+[00:22:55] blocking train: 2206821 S1 x 10320219 pool
+  [India] combo_c: 883188 S1 x 4133346 pool, 52991220 pairs, 379.0s
+  [India] combo: 883188 S1 x 4133346 pool, 26495335 pairs, 217.9s
+  [India] stage-1 filter: 60815925 -> 9862771 pairs (11.2 per S1)
+  [US] combo_c: 1323633 S1 x 6186873 pool, 79417950 pairs, 698.7s
+  [US] combo: 1323633 S1 x 6186873 pool, 39708989 pairs, 273.1s
+  [US] stage-1 filter: 94948743 -> 14577843 pairs (11.0 per S1)
+[00:57:54] house-mismatch token rates: 11557 tokens
+[00:59:09] model pairs 3326413 from 300000 S1, positives 1019538, pair recall 0.9819
+[01:00:05] features (3326413, 66), cv=group folds=5
+  fold 0: best_iter 593, valid logloss 0.0286, 42s
+  fold 1: best_iter 677, valid logloss 0.0279, 47s
+  fold 2: best_iter 602, valid logloss 0.0299, 41s
+  fold 3: best_iter 478, valid logloss 0.0290, 35s
+  fold 4: best_iter 567, valid logloss 0.0283, 42s
+  tuned rule t1=0.7 t2=0.74 r=0.0 -> train macroF0.5 0.9795
+[01:03:37] OOF per country {'India': 0.97631, 'US': 0.98165}
+[01:03:37] training final model on all 3326413 pairs, 641 rounds
+[01:04:22] OOF tuned params (0.7, 0.74, 0.0), OOF macroF0.5 0.9795
+[01:04:22] loading test
+[01:05:45] blocking test: 1732544 S1 x 9969589 pool
+  [France] combo_c: 259452 S1 x 1434993 pool, 15566999 pairs, 62.2s
+  [France] combo: 259452 S1 x 1434993 pool, 7783383 pairs, 30.6s
+  [France] stage-1 filter: 18469880 -> 4331790 pairs (16.7 per S1)
+  [India] combo_c: 809986 S1 x 4717565 pool, 48599047 pairs, 384.6s
+  [India] combo: 809986 S1 x 4717565 pool, 24299276 pairs, 225.1s
+  [India] stage-1 filter: 55101084 -> 9389896 pairs (11.6 per S1)
+  [US] combo_c: 663106 S1 x 3817031 pool, 39786360 pairs, 342.9s
+  [US] combo: 663106 S1 x 3817031 pool, 19893180 pairs, 159.2s
+  [US] stage-1 filter: 48245493 -> 6891213 pairs (10.4 per S1)
+[01:32:33] test house-mismatch token rates: 9009 tokens
+[01:34:32]   scored pairs 2974728/20612899
+[01:35:32]   scored pairs 5946450/20612899
+[01:36:31]   scored pairs 8920308/20612899
+[01:37:29]   scored pairs 11895818/20612899
+[01:38:30]   scored pairs 14872339/20612899
+[01:39:29]   scored pairs 17845655/20612899
+[01:40:24]   scored pairs 20612899/20612899
+[01:41:00] wrote runs/exp09_test: 5830243 matches, 20612899 candidates, empty rows 0.056

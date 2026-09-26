@@ -1,0 +1,12 @@
+[20:44:36] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_65abcab2423d.parquet
+features (4442215, 69)
+all              folds=country  macro 0.9608 per-country {'India': 0.9527, 'US': 0.9662} params (0.86, 0.02, 0.85)
+all              folds=group    macro 0.9752 per-country {'India': 0.9699, 'US': 0.9787} params (0.74, 0.76, 0.0)
+no_xtok          folds=country  macro 0.9609 per-country {'India': 0.9532, 'US': 0.966} params (0.86, 0.02, 0.85)
+no_xtok          folds=group    macro 0.9752 per-country {'India': 0.97, 'US': 0.9787} params (0.72, 0.8, 0.0)
+no_xtok_no_dup   folds=country  macro 0.9588 per-country {'India': 0.9509, 'US': 0.964} params (0.84, 0.8, 0.0)
+no_xtok_no_dup   folds=group    macro 0.9739 per-country {'India': 0.9685, 'US': 0.9776} params (0.78, 0.76, 0.0)
+no_cand_ctx      folds=country  macro 0.9570 per-country {'India': 0.951, 'US': 0.9609} params (0.86, 0.8, 0.0)
+no_cand_ctx      folds=group    macro 0.9730 per-country {'India': 0.9678, 'US': 0.9764} params (0.66, 0.74, 0.0)
+no_len           folds=country  macro 0.9626 per-country {'India': 0.9549, 'US': 0.9678} params (0.82, 0.82, 0.0)
+no_len           folds=group    macro 0.9751 per-country {'India': 0.9696, 'US': 0.9787} params (0.74, 0.02, 0.75)

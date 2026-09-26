@@ -1,0 +1,21 @@
+[22:37:18] loading train
+[22:38:54] learned transliteration dict: 567 tokens
+[22:39:02] blocking train: 2206821 S1 x 10320219 pool
+[22:39:02] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_65abcab2423d.parquet
+[22:39:25] house-mismatch token rates: 14296 tokens
+[22:43:35] model pairs 17772888 from 600000 S1, positives 2025955, pair recall 0.9757
+[22:49:03] features (17772888, 66), cv=group folds=5
+[22:49:03] no-CV mode: 750 rounds, decision params (0.76, 0.74, 0.0) from runs/exp06_test/report/oof.json
+[22:52:07] OOF tuned params (0.76, 0.74, 0.0), OOF macroF0.5 nan
+[22:52:07] loading test
+[22:53:33] blocking test: 1732544 S1 x 9969589 pool
+[22:53:33] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_728d09242cdb.parquet
+[22:53:48] test house-mismatch token rates: 10876 tokens
+[22:59:06]   scored pairs 7371105/51093256
+[23:01:46]   scored pairs 14743978/51093256
+[23:04:25]   scored pairs 22116719/51093256
+[23:07:04]   scored pairs 29489314/51093256
+[23:09:46]   scored pairs 36860472/51093256
+[23:12:24]   scored pairs 44234088/51093256
+[23:14:52]   scored pairs 51093256/51093256
+[23:16:38] wrote runs/exp07_test: 5761435 matches, 51093256 candidates, empty rows 0.059

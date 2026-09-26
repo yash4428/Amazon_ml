@@ -1,0 +1,10 @@
+[04:16:57] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_65abcab2423d.parquet
+[normal] pairs 3554166, positives 405004, synthetic-branch rows 0
+[04:21:44] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_fc055a248c90.parquet
+[crowded] pairs 3504498, positives 404210, synthetic-branch rows 264603
+fold 0 done
+fold 1 done
+model A on normal  val: macro 0.9622 {'India': 0.9548, 'US': 0.9671} params (0.78, 0.02, 0.8)
+model A on CROWDED val: macro 0.9584 {'India': 0.9505, 'US': 0.9635} params (0.78, 0.02, 0.8)
+model B on normal  val: macro 0.9605 {'India': 0.9535, 'US': 0.9652} params (0.86, 0.8, 0.0)
+model B on CROWDED val: macro 0.9601 {'India': 0.9511, 'US': 0.9661} params (0.86, 0.8, 0.0)

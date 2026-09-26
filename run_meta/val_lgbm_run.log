@@ -1,0 +1,30 @@
+[18:20:15] loading train
+[18:21:33] blocking train: 1765458 S1 x 8255490 pool
+  [India] combo: 706551 S1 x 3307514 pool, 14130944 pairs, 194.7s
+  [India] name_c4: 706551 S1 x 3307514 pool, 6957458 pairs, 33.7s
+  [US] combo: 1058907 S1 x 4947976 pool, 21178140 pairs, 200.1s
+  [US] name_c4: 1058907 S1 x 4947976 pool, 10130386 pairs, 72.1s
+[18:32:17] model pairs 10649013 from 400000 S1, positives 1336511, pair recall 0.9655
+[18:33:22] features (10649013, 53)
+  fold 0: best_iter 2000, valid logloss 0.0181, 257s
+  fold 1: best_iter 2000, valid logloss 0.0183, 256s
+  fold 2: best_iter 2000, valid logloss 0.0184, 252s
+  fold 3: best_iter 1997, valid logloss 0.0183, 259s
+  fold 4: best_iter 2000, valid logloss 0.0182, 277s
+  tuned rule t1=0.66 t2=0.7 r=0.0 -> train macroF0.5 0.9622
+[18:55:12] OOF tuned params (0.66, 0.7, 0.0), OOF macroF0.5 0.9622
+[18:55:12] loading test
+[18:56:17] blocking test: 441363 S1 x 2064729 pool
+[18:56:17] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_084a4819c3f3.parquet
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:444: UserWarning: resource_tracker: There appear to be 6 leaked semlock objects to clean up at shutdown: {'/loky-77769-amc90en5': 1, '/loky-77769-pw8gejzm': 1, '/loky-77769-ewyruog4': 1, '/loky-77769-5kp3f_5u': 1, '/loky-77769-qimr9_c6': 1, '/loky-77769-ngu413up': 1}
+  warnings.warn(
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:444: UserWarning: resource_tracker: There appear to be 4 leaked folder objects to clean up at shutdown: {'/var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_b35cc87bd8554bccb4597b3fde454a2d_4bcfc33bc22a466faf31e757c50e50a1': 1, '/var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_c51e32cfb954451cbfdec2222df9e047_8b3947f60da444148f6b00e4b86638c4': 1, '/var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_0021eb3eff99475fac9ef09afa8a02c1_1797d27c86044d47ae4d300b5eeb1084': 1, '/var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_e433e883ad924a8a9db6aaf6efb55230_d2e0fca7eec34da7bf31eaa8e37c8587': 1}
+  warnings.warn(
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:468: UserWarning: resource_tracker: /var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_b35cc87bd8554bccb4597b3fde454a2d_4bcfc33bc22a466faf31e757c50e50a1: FileNotFoundError(2, 'No such file or directory')
+  warnings.warn('resource_tracker: %s: %r' % (name, e))
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:468: UserWarning: resource_tracker: /var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_c51e32cfb954451cbfdec2222df9e047_8b3947f60da444148f6b00e4b86638c4: FileNotFoundError(2, 'No such file or directory')
+  warnings.warn('resource_tracker: %s: %r' % (name, e))
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:468: UserWarning: resource_tracker: /var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_0021eb3eff99475fac9ef09afa8a02c1_1797d27c86044d47ae4d300b5eeb1084: FileNotFoundError(2, 'No such file or directory')
+  warnings.warn('resource_tracker: %s: %r' % (name, e))
+/Users/yashaggarwal/Desktop/student_resource/.venv/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:468: UserWarning: resource_tracker: /var/folders/lv/12rx3rgn4z1by63v0jqpp8w40000gn/T/joblib_memmapping_folder_77769_e433e883ad924a8a9db6aaf6efb55230_d2e0fca7eec34da7bf31eaa8e37c8587: FileNotFoundError(2, 'No such file or directory')
+  warnings.warn('resource_tracker: %s: %r' % (name, e))

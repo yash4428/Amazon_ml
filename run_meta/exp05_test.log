@@ -1,0 +1,36 @@
+[20:11:53] loading train
+[20:13:26] learned transliteration dict: 567 tokens
+[20:13:34] blocking train: 2206821 S1 x 10320219 pool
+  [India] combo_c: 883188 S1 x 4133346 pool, 22079700 pairs, 389.8s
+  [India] combo: 883188 S1 x 4133346 pool, 13247775 pairs, 246.1s
+  [US] combo_c: 1323633 S1 x 6186873 pool, 33090825 pairs, 801.9s
+  [US] combo: 1323633 S1 x 6186873 pool, 19854495 pairs, 258.5s
+[20:42:43] house-mismatch token rates: 14296 tokens
+[20:46:54] model pairs 8885353 from 300000 S1, positives 1012975, pair recall 0.9756
+[20:49:03] features (8885353, 66), cv=group folds=5
+  fold 0: best_iter 678, valid logloss 0.0108, 113s
+  fold 1: best_iter 592, valid logloss 0.0111, 134s
+  fold 2: best_iter 555, valid logloss 0.0112, 129s
+  fold 3: best_iter 788, valid logloss 0.0107, 169s
+  fold 4: best_iter 573, valid logloss 0.0107, 132s
+  tuned rule t1=0.78 t2=0.72 r=0.0 -> train macroF0.5 0.9769
+[21:00:27] OOF per country {'India': 0.97162, 'US': 0.98049}
+[21:00:29] training final model on all 8885353 pairs, 700 rounds
+[21:02:58] OOF tuned params (0.78, 0.72, 0.0), OOF macroF0.5 0.9769
+[21:02:58] loading test
+[21:04:48] blocking test: 1732544 S1 x 9969589 pool
+  [France] combo_c: 259452 S1 x 1434993 pool, 6486279 pairs, 74.9s
+  [France] combo: 259452 S1 x 1434993 pool, 3891770 pairs, 41.8s
+  [India] combo_c: 809986 S1 x 4717565 pool, 20249610 pairs, 433.6s
+  [India] combo: 809986 S1 x 4717565 pool, 12149717 pairs, 255.9s
+  [US] combo_c: 663106 S1 x 3817031 pool, 16577650 pairs, 436.7s
+  [US] combo: 663106 S1 x 3817031 pool, 9946590 pairs, 189.1s
+[21:29:39] test house-mismatch token rates: 10876 tokens
+[21:35:17]   scored pairs 7371105/51093256
+[21:37:25]   scored pairs 14743978/51093256
+[21:39:32]   scored pairs 22116719/51093256
+[21:41:45]   scored pairs 29489314/51093256
+[21:43:52]   scored pairs 36860472/51093256
+[21:46:01]   scored pairs 44234088/51093256
+[21:47:58]   scored pairs 51093256/51093256
+[21:49:51] wrote runs/exp05_test: 5785261 matches, 51093256 candidates, empty rows 0.059

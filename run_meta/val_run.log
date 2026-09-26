@@ -1,0 +1,12 @@
+[13:33:05] loading train
+[13:34:23] blocking train: 300000 S1 x 8255490 pool
+[13:34:23] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_d9185069eb9a.parquet
+[13:34:28] train candidates 7992599, pair recall 0.9661
+  tuned rule t1=0.58 t2=0.82 r=0.0 -> train macroF0.5 0.6964
+[13:34:33] loading test
+[13:35:35] blocking test: 441363 S1 x 2064729 pool
+  [India] combo: 176637 S1 x 825832 pool, 3532740 pairs, 37.8s
+  [India] name_c4: 176637 S1 x 825832 pool, 1764984 pairs, 8.1s
+  [US] combo: 264726 S1 x 1238897 pool, 5294520 pairs, 30.4s
+  [US] name_c4: 264726 S1 x 1238897 pool, 2640608 pairs, 15.0s
+[13:48:19] wrote runs/val: 841582 matches, 11743508 candidates, empty rows 0.054

@@ -1,0 +1,49 @@
+[14:17:16] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_44871b8fbfd7.parquet
+[train] India: 240192 pairs from 20000 S1
+[train] US: 241240 pairs from 20000 S1
+[14:25:34] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_96f8b17bd85e.parquet
+[test] France: 333370 pairs from 20000 S1
+[test] India: 230994 pairs from 20000 S1
+[test] US: 208051 pairs from 20000 S1
+
+=== train vs TEST France: adversarial AUC 0.998
+   ctx_ad_ts_sim_n_close              gain      1119298  train mean     4.003 q50    3.000 | test mean     7.490 q50    7.000
+   xtok_sum                           gain       418762  train mean     2.136 q50    0.000 | test mean     0.364 q50    0.000
+   ctx_n_cand_s1                      gain       345806  train mean    13.945 q50   14.000 | test mean    17.477 q50   19.000
+   addr_tsort                         gain       281462  train mean    56.903 q50   73.514 | test mean    70.140 q50   75.000
+   combo_c_sim                        gain       269561  train mean     0.509 q50    0.462 | test mean     0.536 q50    0.536
+   xtok_max                           gain       191656  train mean     1.673 q50    0.000 | test mean     0.355 q50    0.000
+   combo_sim                          gain       182518  train mean     0.462 q50    0.435 | test mean     0.505 q50    0.592
+   house_absdiff_log                  gain       177692  train mean     1.348 q50    0.000 | test mean     1.175 q50    0.693
+   hmis_max                           gain       149801  train mean     0.457 q50    0.250 | test mean     0.436 q50    0.250
+   n_cand_house_eq_s1                 gain       146069  train mean     3.503 q50    3.000 | test mean     4.706 q50    4.000
+   ctx_combo_sim_rank_cand            gain       145115  train mean    14.840 q50    2.000 | test mean     5.888 q50    2.000
+   house_reldiff                      gain       140133  train mean    -0.220 q50    0.000 | test mean     0.049 q50    0.026
+
+=== train vs TEST India: adversarial AUC 0.884
+   hmis_max                           gain       724807  train mean     0.489 q50    0.325 | test mean     0.497 q50    0.381
+   xtok_max                           gain       196397  train mean     2.401 q50    0.000 | test mean     2.433 q50    0.000
+   s1_name_dup                        gain        69480  train mean    24.743 q50    3.000 | test mean    22.786 q50    3.000
+   house_cluster_size                 gain        40643  train mean     1.674 q50    0.000 | test mean     1.891 q50    1.000
+   cand_name_dup                      gain        37502  train mean    21.482 q50    1.000 | test mean    18.746 q50    1.000
+   hmis_mean                          gain        30905  train mean     0.472 q50    0.300 | test mean     0.480 q50    0.372
+   ctx_ad_ts_sim_n_close              gain        18148  train mean     4.569 q50    4.000 | test mean     4.908 q50    4.000
+   ctx_cp_r_sim_n_close               gain        16996  train mean     5.263 q50    4.000 | test mean     5.067 q50    4.000
+   ctx_nm_ts_sim_n_close              gain        14084  train mean     7.340 q50    7.000 | test mean     7.323 q50    7.000
+   ctx_n_cand_s1                      gain        12359  train mean    13.853 q50   14.000 | test mean    13.437 q50   13.000
+   ctx_combo_c_sim_n_s1_for_cand      gain        12145  train mean    29.089 q50    3.000 | test mean    24.676 q50    3.000
+   name_sim_n_close                   gain        11825  train mean     6.961 q50    6.000 | test mean     6.952 q50    6.000
+
+=== train vs TEST US: adversarial AUC 0.904
+   hmis_max                           gain       357224  train mean     0.424 q50    0.250 | test mean     0.430 q50    0.250
+   s1_name_dup                        gain       228039  train mean    35.443 q50    2.000 | test mean    19.316 q50    1.000
+   cand_name_dup                      gain       224658  train mean    33.984 q50    1.000 | test mean    15.888 q50    1.000
+   house_small_offset                 gain        95487  train mean    -0.341 q50    0.000 | test mean    -0.260 q50    0.000
+   ctx_combo_c_sim_n_s1_for_cand      gain        79475  train mean    45.828 q50    3.000 | test mean    37.963 q50    2.000
+   ctx_n_cand_s1                      gain        70940  train mean    14.036 q50   14.000 | test mean    12.389 q50   11.000
+   xtok_max                           gain        45067  train mean     0.949 q50    0.000 | test mean     0.938 q50    0.000
+   house_cluster_size                 gain        42919  train mean     1.435 q50    0.000 | test mean     1.380 q50    0.000
+   hmis_mean                          gain        36004  train mean     0.410 q50    0.250 | test mean     0.419 q50    0.250
+   combo_c_sim                        gain        24499  train mean     0.516 q50    0.487 | test mean     0.547 q50    0.535
+   ctx_cp_r_sim_n_close               gain        21873  train mean     5.815 q50    4.000 | test mean     4.820 q50    4.000
+   combo_sim                          gain        19068  train mean     0.474 q50    0.448 | test mean     0.505 q50    0.488

@@ -1,0 +1,9 @@
+[21:21:56] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_65abcab2423d.parquet
+features (2961783, 69)
+unseen-country OOF with params (0.78, 0.72, 0.0) {'India': 0.9538, 'US': 0.9628}
+unseen-country OOF with params (0.74, 0.02, 0.75) {'India': 0.9538, 'US': 0.9627}
+unseen-country OOF with params (0.86, 0.02, 0.85) {'India': 0.9539, 'US': 0.9645}
+unseen-country OOF with params (0.84, 0.8, 0.0) {'India': 0.954, 'US': 0.9639}
+unseen-country OOF with params (0.9, 0.9, 0.0) {'India': 0.9533, 'US': 0.9646}
+unseen-country OOF with params (0.82, 0.02, 0.85) {'India': 0.9538, 'US': 0.9644}
+tuned on unseen-country OOF (0.9, 0.86, 0.0) {'India': 0.9537, 'US': 0.9647}

@@ -403,6 +403,8 @@ day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wi
   recovered + examples), `eda_reverse_rank.py` (forward/reverse rank of blocking misses), `eda_empty_owner.py`,
   `eda_empty_fn.py` (empty-address ties), `eda_slices.py` (FN/FP by name/address/house slice), `eda_fr_added.py`,
   `eda_fr_branchwords.py`, `eda_fr_rejected.py`, `eda_orphans.py` (pool records nobody retrieves). Outputs go to `runs/eda/`.
+- **`run_meta/`** (in git) — small copies of every run's `oof.json` (OOF score, tuned params, per-country), `feature_importance.csv`,
+  `run_info.json`, all run logs (`<exp>_test.log`), blend params (`blend_*_params.json`) and chain scripts.
 - `runs/<exp>_test/` (local only) — outputs + report per run; `runs/*.log` — run logs; `submissions/<name>/` — files +
   NOTE.md; `reports/` — early evaluate.py dumps; `experiments.csv` — evaluate.py log (val-split era).
 

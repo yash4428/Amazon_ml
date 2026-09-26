@@ -1,0 +1,26 @@
+{
+  "mode": "lgbm",
+  "params": [
+    0.72,
+    0.74,
+    0.0
+  ],
+  "train_macro_f05": 0.9832577020237563,
+  "blocking": {
+    "combo_c": {
+      "space": "combo_c",
+      "k": 60,
+      "max_df": 20000,
+      "rk": 5
+    },
+    "combo": {
+      "space": "combo",
+      "k": 30,
+      "max_df": 20000,
+      "rk": 5
+    }
+  },
+  "n_s1": 1732544,
+  "n_pred_pairs": 5938471,
+  "n_cand_pairs": 18397912
+}

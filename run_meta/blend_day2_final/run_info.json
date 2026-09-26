@@ -1,0 +1,11 @@
+{
+  "blend_w_a": 0.7,
+  "oof": NaN,
+  "params": [
+    0.72,
+    0.72,
+    0.0
+  ],
+  "a": "runs/exp13_test",
+  "b": "runs/blend_10_11_12"
+}

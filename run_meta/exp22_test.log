@@ -1,0 +1,62 @@
+[21:54:18] loading train
+[21:55:54] learned transliteration dict: 567 tokens
+[21:56:24] crowding: train pool augmented to 11661146 records (+50% fake branches)
+  [India] reverse combo_c: 4670197 pool x 883188 S1, top-5, 23349817 pairs, 203.0s
+  [India] reverse combo: 4670197 pool x 883188 S1, top-5, 23312442 pairs, 130.4s
+  [US] reverse combo_c: 6990949 pool x 1323633 S1, top-5, 34949837 pairs, 359.5s
+  [US] reverse combo: 6990949 pool x 1323633 S1, top-5, 34908171 pairs, 181.5s
+[22:12:30] reverse blocking: 80927491 pairs
+[22:12:33] stage-1: blocking 60000 held-out train S1 for filter training
+[22:19:37] stage-1 trained on 5215318 pairs (86.9/S1, recall 0.9905)
+[22:19:37] blocking train: 2206821 S1 x 11661146 pool
+  [India] combo_c: 883188 S1 x 4670197 pool, 52991138 pairs, 411.1s
+  [India] combo: 883188 S1 x 4670197 pool, 26495391 pairs, 254.2s
+  [India] reverse top-K added 14604728 pairs
+  [India] stage-1 filter: 74849322 -> 9025954 pairs (10.2 per S1)
+  [US] combo_c: 1323633 S1 x 6990949 pool, 79417956 pairs, 751.9s
+  [US] combo: 1323633 S1 x 6990949 pool, 39708990 pairs, 308.4s
+  [US] reverse top-K added 22523024 pairs
+  [US] stage-1 filter: 116279395 -> 13554825 pairs (10.2 per S1)
+[22:59:56] house-mismatch token rates: 8970 tokens
+[23:02:59] global context features done
+[23:03:12] model pairs 8189427 from 800000 S1, positives 2732291, pair recall 0.9869
+[23:05:32] features (8189427, 101), cv=group folds=5
+  fold 0: best_iter 1083, valid logloss 0.0279, 196s
+  fold 1: best_iter 1145, valid logloss 0.0275, 200s
+  fold 2: best_iter 1414, valid logloss 0.0275, 231s
+  fold 3: best_iter 1122, valid logloss 0.0275, 199s
+  fold 4: best_iter 922, valid logloss 0.0281, 165s
+  tuned rule t1=0.72 t2=0.74 r=0.0 -> train macroF0.5 0.9833
+[23:22:11] OOF per country {'India': 0.98131, 'US': 0.98456}
+[23:22:12] training final model on all 8189427 pairs, 1250 rounds
+[23:25:38] OOF tuned params (0.72, 0.74, 0.0), OOF macroF0.5 0.9833
+[23:25:38] loading test
+[23:27:38] blocking test: 1732544 S1 x 9969589 pool
+  [France] reverse combo_c: 1434993 pool x 259452 S1, top-5, 7172685 pairs, 32.7s
+  [France] reverse combo: 1434993 pool x 259452 S1, top-5, 7151841 pairs, 18.7s
+  [India] reverse combo_c: 4717565 pool x 809986 S1, top-5, 23586777 pairs, 166.6s
+  [India] reverse combo: 4717565 pool x 809986 S1, top-5, 23551886 pairs, 115.2s
+  [US] reverse combo_c: 3817031 pool x 663106 S1, top-5, 19084227 pairs, 129.5s
+  [US] reverse combo: 3817031 pool x 663106 S1, top-5, 19071793 pairs, 81.3s
+[23:37:25] reverse blocking: 70271629 pairs
+  [France] combo_c: 259452 S1 x 1434993 pool, 15566999 pairs, 68.3s
+  [France] combo: 259452 S1 x 1434993 pool, 7783383 pairs, 33.0s
+  [France] reverse top-K added 4786964 pairs
+  [France] stage-1 filter: 23256844 -> 3291942 pairs (12.7 per S1)
+  [India] combo_c: 809986 S1 x 4717565 pool, 48599047 pairs, 387.3s
+  [India] combo: 809986 S1 x 4717565 pool, 24299276 pairs, 231.8s
+  [India] reverse top-K added 15243642 pairs
+  [India] stage-1 filter: 70344726 -> 8522688 pairs (10.5 per S1)
+  [US] combo_c: 663106 S1 x 3817031 pool, 39786360 pairs, 356.8s
+  [US] combo: 663106 S1 x 3817031 pool, 19893180 pairs, 160.9s
+  [US] reverse top-K added 13123724 pairs
+  [US] stage-1 filter: 61369217 -> 6583282 pairs (9.9 per S1)
+[00:07:13] test house-mismatch token rates: 7079 tokens
+[00:10:51]   scored pairs 2654019/18397912
+[00:12:00]   scored pairs 5307819/18397912
+[00:13:08]   scored pairs 7962362/18397912
+[00:14:17]   scored pairs 10616681/18397912
+[00:15:26]   scored pairs 13273421/18397912
+[00:16:33]   scored pairs 15929548/18397912
+[00:17:40]   scored pairs 18397912/18397912
+[00:18:21] wrote runs/exp22_test: 5938471 matches, 18397912 candidates, empty rows 0.054

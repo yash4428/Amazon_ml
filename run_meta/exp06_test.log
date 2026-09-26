@@ -1,0 +1,28 @@
+[21:49:58] loading train
+[21:51:38] learned transliteration dict: 567 tokens
+[21:51:45] blocking train: 2206821 S1 x 10320219 pool
+[21:51:45] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_65abcab2423d.parquet
+[21:52:04] house-mismatch token rates: 14296 tokens
+[21:55:43] model pairs 8885353 from 300000 S1, positives 1012975, pair recall 0.9756
+[21:58:08] features (8885353, 66), cv=group folds=5
+  fold 0: best_iter 743, valid logloss 0.0108, 100s
+  fold 1: best_iter 616, valid logloss 0.0110, 99s
+  fold 2: best_iter 627, valid logloss 0.0112, 98s
+  fold 3: best_iter 716, valid logloss 0.0108, 113s
+  fold 4: best_iter 761, valid logloss 0.0107, 119s
+  tuned rule t1=0.76 t2=0.74 r=0.0 -> train macroF0.5 0.9771
+[22:07:04] OOF per country {'India': 0.97194, 'US': 0.98048}
+[22:07:05] training final model on all 8885353 pairs, 761 rounds
+[22:08:50] OOF tuned params (0.76, 0.74, 0.0), OOF macroF0.5 0.9771
+[22:08:50] loading test
+[22:10:18] blocking test: 1732544 S1 x 9969589 pool
+[22:10:18] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_728d09242cdb.parquet
+[22:10:34] test house-mismatch token rates: 10876 tokens
+[22:16:49]   scored pairs 7371105/51093256
+[22:19:39]   scored pairs 14743978/51093256
+[22:22:24]   scored pairs 22116719/51093256
+[22:25:12]   scored pairs 29489314/51093256
+[22:27:58]   scored pairs 36860472/51093256
+[22:30:41]   scored pairs 44234088/51093256
+[22:33:12]   scored pairs 51093256/51093256
+[22:35:03] wrote runs/exp06_test: 5768700 matches, 51093256 candidates, empty rows 0.058

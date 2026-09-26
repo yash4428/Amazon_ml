@@ -1,0 +1,36 @@
+[02:08:33] loading train
+[02:10:02] learned transliteration dict: 567 tokens
+[02:10:28] crowding: train pool augmented to 11661146 records (+50% fake branches)
+[02:10:32] stage-1: blocking 60000 held-out train S1 for filter training
+[02:16:31] stage-1 trained on 4196569 pairs (69.9/S1, recall 0.9850)
+[02:16:31] blocking train: 2206821 S1 x 11661146 pool
+  [India] combo_c: 883188 S1 x 4670197 pool, 52991138 pairs, 396.7s
+  [India] combo: 883188 S1 x 4670197 pool, 26495391 pairs, 232.3s
+  [India] stage-1 filter: 60244594 -> 10627452 pairs (12.0 per S1)
+  [US] combo_c: 1323633 S1 x 6990949 pool, 79417956 pairs, 736.2s
+  [US] combo: 1323633 S1 x 6990949 pool, 39708990 pairs, 305.0s
+  [US] stage-1 filter: 93756371 -> 15853364 pairs (12.0 per S1)
+[02:53:07] house-mismatch token rates: 11069 tokens
+[02:54:30] model pairs 3603185 from 300000 S1, positives 1018696, pair recall 0.9811
+[02:55:32] features (3603185, 66), cv=group folds=5
+  fold 0: best_iter 508, valid logloss 0.0273, 37s
+  fold 1: best_iter 724, valid logloss 0.0273, 50s
+  fold 2: best_iter 717, valid logloss 0.0274, 54s
+  fold 3: best_iter 638, valid logloss 0.0269, 54s
+  fold 4: best_iter 860, valid logloss 0.0283, 69s
+  tuned rule t1=0.72 t2=0.7 r=0.0 -> train macroF0.5 0.9789
+[02:59:59] OOF per country {'India': 0.9756, 'US': 0.98108}
+[03:00:00] training final model on all 3603185 pairs, 758 rounds
+[03:00:59] OOF tuned params (0.72, 0.7, 0.0), OOF macroF0.5 0.9789
+[03:00:59] loading test
+[03:02:21] blocking test: 1732544 S1 x 9969589 pool
+[03:02:21] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_96f8b17bd85e.parquet
+[03:02:36] test house-mismatch token rates: 9009 tokens
+[03:04:32]   scored pairs 2974728/20612899
+[03:05:32]   scored pairs 5946450/20612899
+[03:06:33]   scored pairs 8920308/20612899
+[03:07:34]   scored pairs 11895818/20612899
+[03:08:34]   scored pairs 14872339/20612899
+[03:09:35]   scored pairs 17845655/20612899
+[03:10:31]   scored pairs 20612899/20612899
+[03:11:07] wrote runs/exp10_test: 5867485 matches, 20612899 candidates, empty rows 0.056

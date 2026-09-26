@@ -1,0 +1,32 @@
+[14:35:58] loading train
+[14:37:37] learned transliteration dict: 567 tokens
+[14:38:06] crowding: train pool augmented to 11661146 records (+50% fake branches)
+[14:38:42] stage-1: blocking 60000 held-out train S1 for filter training
+[14:45:21] stage-1 trained on 4200248 pairs (70.0/S1, recall 0.9852)
+[14:45:21] blocking train: 2206821 S1 x 11661146 pool
+[14:45:21] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/train_44871b8fbfd7.parquet
+[14:45:40] house-mismatch token rates: 11069 tokens
+[14:49:38] global context features done
+[14:49:49] model pairs 9603347 from 800000 S1, positives 2716560, pair recall 0.9813
+[14:53:06] features (9603347, 95), cv=group folds=5
+  fold 0: best_iter 1416, valid logloss 0.0236, 296s
+  fold 1: best_iter 1016, valid logloss 0.0238, 229s
+  fold 2: best_iter 1250, valid logloss 0.0240, 241s
+  fold 3: best_iter 1324, valid logloss 0.0234, 251s
+  fold 4: best_iter 1284, valid logloss 0.0239, 263s
+  tuned rule t1=0.74 t2=0.02 r=0.75 -> train macroF0.5 0.9813
+[15:14:35] OOF per country {'India': 0.97867, 'US': 0.98313}
+[15:14:37] training final model on all 9603347 pairs, 1383 rounds
+[15:19:11] OOF tuned params (0.74, 0.02, 0.75), OOF macroF0.5 0.9813
+[15:19:11] loading test
+[15:21:09] blocking test: 1732544 S1 x 9969589 pool
+[15:21:09] blocking cache hit /Users/yashaggarwal/Desktop/student_resource/cache/blocks/test_96f8b17bd85e.parquet
+[15:21:24] test house-mismatch token rates: 9009 tokens
+[15:25:54]   scored pairs 2974728/20612899
+[15:27:20]   scored pairs 5946450/20612899
+[15:28:46]   scored pairs 8920308/20612899
+[15:30:10]   scored pairs 11895818/20612899
+[15:31:39]   scored pairs 14872339/20612899
+[15:33:07]   scored pairs 17845655/20612899
+[15:34:28]   scored pairs 20612899/20612899
+[15:35:16] wrote runs/exp20_test: 5776612 matches, 20612899 candidates, empty rows 0.058
