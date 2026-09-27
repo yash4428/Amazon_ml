@@ -11,3 +11,7 @@
 | day2_4 | C = Aprime minus US shifted-number pairs | - | - | - | **0.970125** (US +0.0036) |
 | day2_5 | day2_final_v2 = 3-seed blend 17/18/19 + robust France house rule + US shift | blend OOF 0.98145 (common S1) | - | - | **0.970385** (+0.00026 vs C) |
 | day3_1 | day3_exp23_rules = exp23 (reverse top-5 + crowd 0.9) + robust house rule + US shift | OOF 0.9838 (crowd-0.9 pool) | - | - | **0.970601** (+0.00022 vs day2_final_v2, +0.00048 vs C) |
+| day3_2 | day3_exp23_rules_swapFR = day3_1 + France word-swap rule (France-only) | - | - | - | **0.972832** (+0.002231 => France +0.0149) |
+| day3_3 | teammate file (her pipeline, code lost) | - | - | - | **0.984833** |
+| day3_4 | probe_tm_house_swap = teammate + our France house + word-swap rules (France-only) | - | - | - | **0.988587** (+0.003754 => France +0.0251) |
+| day3_5 | probe_tm_house_swap_typeswap = day3_4 + in-place type-swap rule (France-only) | - | - | - | **0.989332** (+0.000745 => France +0.0050) |

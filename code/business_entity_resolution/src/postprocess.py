@@ -71,6 +71,45 @@ def word_swap(n1, n2):
     return r, d
 
 
+# Type-word swap rule (27 Sep, dev/eda_suffix_ratio.py): per country, a word is a business-TYPE word when it is
+# common in S1 names (>= min freq) and about as common in pool names as in S1 names (pool/S1 share ratio < max
+# ratio): copies inherit it from their S1. Words the generator ADDS (copy suffixes: et/fils, associes, dba; fake-branch
+# words: groupe, developpement, participations, holding) have ratios >> 1. A pair whose S1 name loses a type word
+# while the candidate gains a different type word ("Hubert Bar SAS" -> "Hubert Immobiliere SAS") is a different
+# business at the same address. Legal forms, articles and the copy-suffix words of _SWAP_IGNORE are ignored.
+_TYPE_IGNORE = set("inc incorporated llc llp ltd limited corp corporation co company plc lp pvt private opc huf sarl sas "
+                   "sasu sa eurl sci snc sca cie ste societe ei the and et of de du des la le les a d l".split())
+
+
+_LEGAL_POS = set("sarl sas sasu sa eurl sci snc sca ei inc llc llp ltd limited corp corporation plc lp pvt private".split())
+
+
+def type_swap_flags(n1s, n2s, type_words, ignore=None):
+    """Bool per pair: the candidate replaces >= 1 type word of the S1 name by a different type word placed IN the
+    name (not appended after the legal form / at the end, where the generator puts copy suffixes like "SARL France",
+    "SARL Cie"). Legal forms / articles never count; typos (similar words) are not swaps."""
+    from rapidfuzz.distance import Levenshtein
+    out = np.zeros(len(n1s), bool)
+    for k, (n1, n2) in enumerate(zip(n1s, n2s)):
+        ig = _TYPE_IGNORE if ignore is None else ignore
+        a, b = set(n1.split()) - ig, set(n2.split()) - ig
+        rem, add = a - b, b - a
+        if not rem or not add:
+            continue
+        for r in list(rem):
+            for d in list(add):
+                if Levenshtein.normalized_similarity(r, d) >= 0.5 or r in d or d in r:
+                    rem.discard(r); add.discard(d); break
+        if not (rem & type_words):
+            continue
+        toks = n2.split()
+        lpos = [p for p, t in enumerate(toks) if t in _LEGAL_POS]
+        cut = min(lpos) if lpos else len(toks) - 1          # suffix zone: after the first legal form, or the last token
+        in_place = {t for p, t in enumerate(toks) if p < cut}
+        out[k] = bool(add & type_words & in_place)
+    return out
+
+
 def street_number(addr):
     """Number directly preceding a street-type word ('' if none)."""
     a = unicodedata.normalize("NFKD", addr)
@@ -84,7 +123,9 @@ def street_number(addr):
 def main():
     """Load a run's test scores, apply the decision rule and the optional post-processing rules, write outputs."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", required=True, help="run dir with test_scores.parquet and report/oof.json")
+    ap.add_argument("--run", required=True, nargs="+",
+                    help="run dir(s) with test_scores.parquet; several = equal-weight seed blend of their scores "
+                         "(the runs must share the test candidate set)")
     ap.add_argument("--params", default="", help="json with 'params' (default: <run>/report/oof.json)")
     ap.add_argument("--test-dir", default=os.path.join(config.ROOT, "dataset", "test"))
     ap.add_argument("--out", required=True)
@@ -99,12 +140,26 @@ def main():
     ap.add_argument("--swap-threshold", type=float, default=1.0)
     ap.add_argument("--swap-min-freq", type=int, default=200, help="min #S1 names containing each swapped word")
     ap.add_argument("--swap-countries", nargs="*", default=[], help="restrict the swap rule to these countries")
+    ap.add_argument("--type-swap-rule", action="store_true",
+                    help="drop accepted pairs whose S1 loses a business-type word while the candidate gains another, in "
+                         "countries where such accepted pairs are >= --swap-threshold per 100 S1 (label-free switch)")
+    ap.add_argument("--type-min-freq", type=int, default=20)
+    ap.add_argument("--type-max-ratio", type=float, default=1.3)
     a = ap.parse_args()
 
-    prm = tuple(json.load(open(a.params or os.path.join(a.run, "report", "oof.json")))["params"])
+    prm = tuple(json.load(open(a.params or os.path.join(a.run[0], "report", "oof.json")))["params"])
     s1, pool = load_normalized(a.test_dir, "test", n_jobs=config.N_JOBS)
     s1, pool = reparse_numbers(s1, n_jobs=config.N_JOBS), reparse_numbers(pool, n_jobs=config.N_JOBS)
-    t = pd.read_parquet(os.path.join(a.run, "test_scores.parquet"))
+    t = pd.read_parquet(os.path.join(a.run[0], "test_scores.parquet"))
+    if len(a.run) > 1:          # seed blend: mean score over runs, same (i, j) candidate set required
+        t = t.sort_values(["i", "j"]).reset_index(drop=True)
+        for r in a.run[1:]:
+            u = pd.read_parquet(os.path.join(r, "test_scores.parquet")).sort_values(["i", "j"]).reset_index(drop=True)
+            assert len(u) == len(t) and (u["i"].values == t["i"].values).all() and (u["j"].values == t["j"].values).all(), \
+                f"{r}: different candidate set"
+            t["score"] = t["score"].values + u["score"].values
+        t["score"] = (t["score"] / len(a.run)).astype(np.float32)
+        print(f"  blended {len(a.run)} runs: {a.run}")
     pr = apply_rule(t, *prm).reset_index(drop=True)
     cty = s1["country"].values[pr["i"].values]
     cf = cluster_features(pr, s1, pool)
@@ -140,6 +195,22 @@ def main():
                   f"{'APPLIED' if apply else 'not applied'}")
             if apply:
                 drop |= m & fs
+    if a.type_swap_rule:
+        import collections
+        for c in sorted(set(cty)):
+            ms, mp = s1["country"].values == c, pool["country"].values == c
+            fs = collections.Counter(t for n in s1["name_norm"].values[ms] for t in set(n.split()))
+            fp = collections.Counter(t for n in pool["name_norm"].values[mp] for t in set(n.split()))
+            ns, npl = max(int(ms.sum()), 1), max(int(mp.sum()), 1)
+            types = {w for w, f in fs.items() if f >= a.type_min_freq and (fp[w] / npl) / ((f + 1) / ns) < a.type_max_ratio}
+            m = np.flatnonzero((cty == c) & ~drop)
+            ts = type_swap_flags(s1["name_norm"].values[pr["i"].values[m]], pool["name_norm"].values[pr["j"].values[m]], types)
+            rate = 100 * float(ts.sum()) / ns
+            apply = rate >= a.swap_threshold
+            print(f"  {c:8s} {len(types)} type words; accepted type-word swaps (after other rules) per 100 S1 = {rate:6.2f}"
+                  f" -> type-swap rule {'APPLIED' if apply else 'not applied'}")
+            if apply:
+                drop[m[ts]] = True
     for c in a.shift_rule:
         sh = (cty == c) & (cf["branch_sig"].values == 1)
         if a.shift_keep_only:
@@ -159,6 +230,7 @@ def main():
         json.dump({"run": a.run, "params": prm, "house_rule": a.house_rule, "shift_rule": a.shift_rule,
                    "shift_keep_only": a.shift_keep_only, "swap_rule": a.swap_rule,
                    "swap_threshold": a.swap_threshold, "swap_min_freq": a.swap_min_freq,
+                   "type_swap_rule": a.type_swap_rule, "type_min_freq": a.type_min_freq, "type_max_ratio": a.type_max_ratio,
                    "dropped": int(drop.sum())}, f, indent=2)
 
 
