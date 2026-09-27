@@ -15,3 +15,5 @@
 | day3_3 | teammate file (her pipeline, code lost) | - | - | - | **0.984833** |
 | day3_4 | probe_tm_house_swap = teammate + our France house + word-swap rules (France-only) | - | - | - | **0.988587** (+0.003754 => France +0.0251) |
 | day3_5 | probe_tm_house_swap_typeswap = day3_4 + in-place type-swap rule (France-only) | - | - | - | **0.989332** (+0.000745 => France +0.0050) |
+| day3_6 | final1_A_plus_adds = day3_5 + societe type words + 8,605 of our >=0.99 same/no-number pairs | - | - | - | **0.989378** (+0.000046) |
+| day3_7 | final2 = final1 - 11,099 low-score shifted US/India pairs (keep-only) | - | - | - | **0.988827** (-0.000551: those were mostly true copies) |

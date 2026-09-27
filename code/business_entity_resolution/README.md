@@ -10,41 +10,40 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r code/business_entity_resolution/requirements.txt
 ```
 
-## Reproduce the submission (run from `student_resource/`)
+## Reproduce the outputs (run from `student_resource/`)
 
-Current best model (**exp22**, OOF 0.9833) = exp17 settings + reverse top-5 blocking, then the post-rules:
-
-```bash
-.venv/bin/python code/business_entity_resolution/src/run_pipeline.py \
-    --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp22_test \
-    --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17 --rev-k 5      # ~2.5 h cold
-.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp22_test --out output \
-    --house-rule --shift-rule US
-```
-
-Seed blends: run the same command with `--sample-seed 4` / `5` (blocking caches are reused, ~1 h each), blend with
-`dev/blend.py`, then `postprocess.py --run <blend dir> --params <blend params json> --house-rule --shift-rule US`.
-
-Earlier public files (exp17 based; public 0.969 = exp17 + the data-driven France house-number rule):
+### A. Fully reproducible pipeline (public 0.972832 single model; 3-seed blend below)
 
 ```bash
-# 1) model run (~100 min cold, ~60 min with caches in cache/)
-.venv/bin/python code/business_entity_resolution/src/run_pipeline.py \
-    --train-dir dataset/train --test-dir dataset/test --out-dir runs/exp17_test \
-    --crowd 0.5 --sample-seed 3 --model-s1 800000 --profile exp17
-# 2) decision + post-processing rules on the saved scores (~3 min) -> output/
-.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp17_test --out output --house-rule
-#    (+ --shift-rule US for the day2_C variant)
+# 1) three model runs (same settings, different train-S1 samples); ~2.5 h cold for the first, ~1 h each after
+#    (blocking results are cached in cache/blocks/)
+for s in 3 4 5; do
+  .venv/bin/python code/business_entity_resolution/src/run_pipeline.py --train-dir dataset/train \
+      --test-dir dataset/test --out-dir runs/exp23_s$s --crowd 0.9 --sample-seed $s --model-s1 800000 \
+      --profile exp17 --rev-k 5
+done
+# 2) 3-seed blend + decision + label-free post-rules -> output/
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp23_s3 runs/exp23_s4 runs/exp23_s5 \
+    --params code/business_entity_resolution/final_params.json --out output \
+    --house-rule --shift-rule US --swap-rule --type-swap-rule
 # 3) checks
 python3 utils/validate_submission.py --matching output/matching_results.tsv \
     --candidate output/candidate_pairs.tsv --test-dir dataset/test
 .venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir output --test-dir dataset/test
 ```
 
-`--profile exp17` restores the exp17 settings (learned branch-word features kept, no count clipping, original postcode
-parser); without it `config.py` defaults (exp21 settings) are used. `postprocess.py` applies the house rule only to
-countries whose accepted true-copy-like pairs show no house-number noise (measured without labels: France 1.08
-digit-drop pairs per 100 S1 vs ~20-23 in US/India). Both rules only remove pairs, so matches ⊆ candidates.
+### B. Best leaderboard file (0.989378)
+
+Starts from a teammate model's output (`inputs/teammate_matching_results.tsv`; its code was lost) and applies our rules
+and our confident extra pairs:
+
+```bash
+.venv/bin/python code/business_entity_resolution/dev/apply_rules_to_file.py inputs/teammate_matching_results.tsv \
+    runs/best_rules --house-rule --type-swap --societe-type
+# our 3-seed blend scores must exist (step A) -> runs/eda/blend_scores_cat.parquet via dev/eda_mimic.py
+.venv/bin/python code/business_entity_resolution/dev/final_adds.py runs/best_rules/matching_results.tsv \
+    <our step-A output>/matching_results.tsv --out output_best
+```
 
 ## Validation
 
