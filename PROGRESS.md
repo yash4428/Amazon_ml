@@ -7,37 +7,29 @@ Last full rewrite: 26 Sep 2026 ~17:40 IST; §0/§1/§4/§6c/§8-§10/§12/§13 u
 
 ---------------------------------------------------------------------------------------------------------------
 
-## 0. TL;DR — where we are (updated 27 Sep 00:40 IST)
+## 0. TL;DR — FINAL STATE (27 Sep 2026, 22:10 IST)
 
 | item | value |
 |---|---|
-| **Best public score** | **0.970385** — `submissions/day2_final_v2` (3-seed blend exp17/18/19 + robust France house rule + US shift rule) |
-| **Upload next (day 3, slot 1)** | `submissions/day3_exp22_rules/matching_results.tsv` = **exp22** (reverse top-5 blocking, OOF **0.9833** vs 0.9815) + same rules. Expected ≈0.972-0.973 |
-| Running (chained, local machine) | exp23 = exp22 + crowd 0.9 (started 00:20, ETA ~02:30) → exp22 seeds 4, 5 (`runs/exp22s4_test`, `exp22s5_test`, ETA ~04:30) |
-| Leaderboard (27 Sep 00:00) | leader 0.9907, top-100 ≈ 0.985-0.986; we are ~600th |
-| Honest local score (best model) | **exp22 OOF 0.9833** (India 0.9813, US 0.9846); exp17 0.98146 (same 800k-S1 sample, seed 3) |
-| Public decomposition (exact, from probes) | Aprime: **US+India ≈ 0.9735, France ≈ 0.942** (singleton rate 0.0558 in every train country); C: US+IN ≈ 0.975 |
-| Deadline | leaderboard closes **27 Sep 23:59 IST**; package (zip) ready by **27 Sep 18:00 IST** (`METHODOLOGY.md` = filled template draft) |
+| **Best public score** | **0.989378** — `submissions/final1_A_plus_adds` (teammate model output + our France rules + our confident extra pairs) |
+| Last upload | 0.988827 (`final2_F1_shiftlow_keeponly`: removing low-confidence shifted US/India pairs HURT) |
+| Best fully reproducible file | 0.972832 (`day3_exp23_rules_swapFR`: exp23 + house/shift/swap rules) |
+| Package | `TEAMNAME_submission.zip` (rename with the team name): output = best file, inputs = teammate file, code, methodology |
 
-**The story so far.** Blocking + a LightGBM pair model + tuned decision rule gets ~0.98 locally, but every upload
-scored 0.011-0.019 below local. Probes located the loss (France ≈0.94, US+India ≈0.975). Fake branches (a different
-business with the S1's name and a shifted house number) explained part of it. Two label-free rules gave +0.0014 each:
-the France house rule (French copies keep their house number) and the US shift rule (test has 4× the train rate of
-"same street, number ±1..30" look-alikes). On 26 Sep night a **loss decomposition** (§6c) showed that 60% of our
-local loss is RECALL (S1 with correct but incomplete match lists). Blocking alone lost 52k true pairs, 60% of them S1
-whose name is shared by ≥3 S1, so their top-60 list floods with look-alikes. **Reverse top-K blocking** (each pool
-record also keeps its 5 closest S1) fixed 30% of those misses: exp22 OOF 0.9815 → 0.9833 with 15% fewer candidates.
-Test also has ≈1.9× the distractors per S1 of train (crowd 0.5 only simulates 1.5×) → exp23 trains at crowd 0.9.
+**What moved the leaderboard (all measured with one-country-at-a-time uploads):**
+- France house rule (+0.013 France), US shift rule (+0.0036 US) — fake branches with shifted house numbers.
+- **France word-swap rule** (+0.0149 France on our model, **+0.0251 France on the teammate model**) and **in-place
+  type-swap rule** (+0.0050 France): French sibling businesses at the same address that differ by one type word
+  ("Campagne Comite SAS" vs "Campagne Sportive SAS"). Found by comparing accepted-pair categories across countries.
+- Teammate model (0.984833; code LOST): much better than ours on US/India. From her output (dev/eda_teammate_*.py):
+  her blocking reached ~34k India pairs outside our candidates; she kept confident shifted US pairs and rejected
+  mid-score shifted India pairs; higher French recall on same-number pairs; she missed native-script Indian copies and
+  French acronym / made-up-name copies that our model catches (adding 8.6k of ours: +0.00005).
+- Reverse top-K blocking + crowd 0.9 + 3-seed blend: local OOF 0.9815 → 0.9840, public only +0.0005 (model gains
+  transfer ~20-25%).
 
-**Day 3 plan (5 uploads).** Every upload must teach something AND be a candidate final:
-1. `day3_exp22_rules` — public effect of reverse blocking vs C (0.970125 = same rules on exp17).
-   ≥0.972 → exp22 is the new base. ≤0.9705 → build exp22 US+IN + day2_final_v2 France rows to separate countries.
-2. `day3_exp23_rules` (after exp23 finishes: `postprocess.py --run runs/exp23_test --out submissions/day3_exp23_rules
-   --house-rule --shift-rule US`) — public effect of test-like density (compare with slot 1).
-3. Blend of the winner's seeds (exp22 + exp22s4 + exp22s5, or exp23 seeds if exp23 wins — then queue
-   `--sample-seed 4/5` runs of exp23 in the morning, ~55 min each with blocking caches) via `dev/blend.py`
-   (writes `test_scores.parquet` + params) → `postprocess.py --run <blend> --params <params.json> --house-rule --shift-rule US`.
-4-5. Final + one spare (e.g. `--shift-keep-only` variant or a France-only probe). Package by 18:00 (§11).
+**To rebuild later:** re-create the teammate pipeline, then run `dev/apply_rules_to_file.py <her output> <dir>
+--house-rule --type-swap --societe-type` and `dev/final_adds.py` (see code README §B).
 
 ---------------------------------------------------------------------------------------------------------------
 
