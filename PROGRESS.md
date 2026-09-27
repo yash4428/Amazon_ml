@@ -334,7 +334,8 @@ no_cand_ctx 0.9570, no_len 0.9626 (length feats removed).
 | 2/3 | day2_Aprime | exp17 − French house-diff pairs | **0.969** | **France 0.938** |
 | 2/4 | day2_C_us_shift | Aprime − 64,911 US shifted-number pairs | **0.970125** | US +0.0036 (Aprime 0.968745) |
 | 2/5 | day2_final_v2 | 3-seed blend 17/18/19 + robust France house rule + US shift rule | **0.970385** | +0.00026 vs C: blend + France fix transfer, small |
-| 3/1 | day3_exp22_rules | exp22 (reverse top-5 blocking) + robust house rule + US shift | *to upload* | reverse-blocking effect vs C |
+| 3/1 | day3_exp23_rules | exp23 (reverse top-5 + crowd 0.9, OOF 0.9838) + robust house rule + US shift | **0.970601** | +0.00048 vs C: model gain transfers only ~20-25% |
+| 3/2 | day3_exp23_rules_swapFR | 3/1 + France word-swap rule (France-only diff) | *uploading* | ΔFrance = (S − 0.970601)/0.1498 |
 
 Built but not submitted: day2_exp17 (exp17 alone), day2_A_exp17usin_exp20fr, day2_blend_17_18_19, day2_exp13,
 day2_blend_13_14, day2_blend3, day2_blend_10_11, day2_exp10_crowd, day2_exp09_wide, day2_final, day2_probe_france.
