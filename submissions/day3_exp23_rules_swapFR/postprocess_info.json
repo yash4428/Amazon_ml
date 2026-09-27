@@ -1,0 +1,17 @@
+{
+  "run": "runs/exp23_test",
+  "params": [
+    0.76,
+    0.74,
+    0.0
+  ],
+  "house_rule": true,
+  "shift_rule": [
+    "US"
+  ],
+  "shift_keep_only": false,
+  "swap_rule": true,
+  "swap_threshold": 1.0,
+  "swap_min_freq": 200,
+  "dropped": 157436
+}

@@ -44,6 +44,33 @@ _STREET = (r"(?:rue|r|avenue|av|ave|bd|boulevard|blvd|boul|allee|all|chemin|ch|c
 _STREET_NUM = re.compile(r"(?<![\d])(\d+)\s*(?:bis|ter|quater|[a-d])?\s*[,.-]?\s+" + _STREET + r"\b\.?")
 
 
+# Word-swap rule (EDA 27 Sep, dev/eda_word_swap*.py). A candidate whose name replaces ONE frequent word of the S1 name
+# by ANOTHER frequent word ("Campagne Comite SAS" -> "Campagne Sportive SAS") is a different business: in train
+# (labels) such candidates are 37.4 per 100 S1 with true rate 0.001, and the model accepts only 0.02 per 100 S1. In
+# France (names = <City> <Type> <LegalForm>, exact shared addresses) the model accepts 8.8 per 100 S1. Legal forms,
+# generator noise suffixes and articles are ignored when comparing names; typos (similar words) are not swaps.
+_SWAP_IGNORE = set(
+    "inc incorporated llc llp ltd limited corp corporation co company plc lp pvt private opc huf sarl sas sasu sa eurl "
+    "sci snc sca cie ste societe the and et of de du des la le les a d l center centre services service dba aka "
+    "formerly fka nee known as doing business trading ta shri sri smt mr ms dr m s fils compagnie associes france "
+    "partners group groupe holding holdings international".split())
+
+
+def word_swap(n1, n2):
+    """(removed, added) if normalised name n2 substitutes exactly one non-ignored word of n1 by a dissimilar word."""
+    from rapidfuzz.distance import Levenshtein
+    a, b = set(n1.split()) - _SWAP_IGNORE, set(n2.split()) - _SWAP_IGNORE
+    rem, add = a - b, b - a
+    if len(rem) != 1 or len(add) != 1:
+        return None
+    r, d = next(iter(rem)), next(iter(add))
+    if len(r) < 3 or len(d) < 3 or r.isdigit() or d.isdigit():
+        return None
+    if Levenshtein.normalized_similarity(r, d) >= 0.5 or r in d or d in r:
+        return None
+    return r, d
+
+
 def street_number(addr):
     """Number directly preceding a street-type word ('' if none)."""
     a = unicodedata.normalize("NFKD", addr)
@@ -66,6 +93,12 @@ def main():
     ap.add_argument("--shift-rule", nargs="*", default=[])
     ap.add_argument("--shift-keep-only", action="store_true",
                     help="shift rule never empties an S1: shifted pairs are dropped only if the S1 keeps a normal match")
+    ap.add_argument("--swap-rule", action="store_true",
+                    help="drop accepted pairs whose names differ by a frequent-word swap, in countries where such "
+                         "accepted pairs are >= --swap-threshold per 100 S1 (label-free switch)")
+    ap.add_argument("--swap-threshold", type=float, default=1.0)
+    ap.add_argument("--swap-min-freq", type=int, default=200, help="min #S1 names containing each swapped word")
+    ap.add_argument("--swap-countries", nargs="*", default=[], help="restrict the swap rule to these countries")
     a = ap.parse_args()
 
     prm = tuple(json.load(open(a.params or os.path.join(a.run, "report", "oof.json")))["params"])
@@ -94,6 +127,19 @@ def main():
                 print(f"  {c:8s} house rule: {len(cand)} first-number mismatches, {int(artefact.sum())} kept "
                       f"(equal street number = parsing artefact)")
                 drop[cand[~artefact]] = True
+    if a.swap_rule:
+        import collections
+        freq = collections.Counter(t for n in s1["name_norm"].values for t in set(n.split()))
+        sw = [word_swap(x, y) for x, y in zip(s1["name_norm"].values[pr["i"].values], pool["name_norm"].values[pr["j"].values])]
+        fs = np.array([x is not None and freq[x[0]] >= a.swap_min_freq and freq[x[1]] >= a.swap_min_freq for x in sw])
+        for c in sorted(set(cty)):
+            m = cty == c
+            rate = 100 * float(fs[m].sum()) / max(int((s1["country"].values == c).sum()), 1)
+            apply = rate >= a.swap_threshold and (not a.swap_countries or c in a.swap_countries)
+            print(f"  {c:8s} accepted frequent-word swaps per 100 S1 = {rate:6.2f} -> swap rule "
+                  f"{'APPLIED' if apply else 'not applied'}")
+            if apply:
+                drop |= m & fs
     for c in a.shift_rule:
         sh = (cty == c) & (cf["branch_sig"].values == 1)
         if a.shift_keep_only:
@@ -111,7 +157,8 @@ def main():
     write_outputs(a.out, list(s1_ids), group_ids(keep, s1_ids, pool_ids), group_ids(t, s1_ids, pool_ids))
     with open(os.path.join(a.out, "postprocess_info.json"), "w") as f:
         json.dump({"run": a.run, "params": prm, "house_rule": a.house_rule, "shift_rule": a.shift_rule,
-                   "shift_keep_only": a.shift_keep_only,
+                   "shift_keep_only": a.shift_keep_only, "swap_rule": a.swap_rule,
+                   "swap_threshold": a.swap_threshold, "swap_min_freq": a.swap_min_freq,
                    "dropped": int(drop.sum())}, f, indent=2)
 
 
