@@ -16,3 +16,6 @@ submissions/*/*.tsv
 
 # early evaluate.py error dumps (contain training records; >100 MB)
 reports/*.tsv
+
+# teammate model output (large, test predictions) - shipped only inside the submission zip
+code/business_entity_resolution/inputs/

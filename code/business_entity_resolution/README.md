@@ -32,18 +32,22 @@ python3 utils/validate_submission.py --matching output/matching_results.tsv \
 .venv/bin/python code/business_entity_resolution/src/sanity_check.py --out-dir output --test-dir dataset/test
 ```
 
-### B. Best leaderboard file (0.989378)
+### B. Best leaderboard file (public 0.989378) — the submitted `output/`
 
-Starts from a teammate model's output (`inputs/teammate_matching_results.tsv`; its code was lost) and applies our rules
-and our confident extra pairs:
+The best file combines (1) the output of a teammate's independent model, shipped unchanged as
+`inputs/teammate_matching_results.tsv` (public 0.984833; **its source code was lost**, so this file is an input, not
+something this folder can regenerate), with (2) our model runs from step A and our label-free rules. After step A:
 
 ```bash
-.venv/bin/python code/business_entity_resolution/dev/apply_rules_to_file.py inputs/teammate_matching_results.tsv \
-    runs/best_rules --house-rule --type-swap --societe-type
-# our 3-seed blend scores must exist (step A) -> runs/eda/blend_scores_cat.parquet via dev/eda_mimic.py
-.venv/bin/python code/business_entity_resolution/dev/final_adds.py runs/best_rules/matching_results.tsv \
-    <our step-A output>/matching_results.tsv --out output_best
+bash code/business_entity_resolution/dev/make_best_file.sh runs/exp23_s3 runs/exp23_s4 runs/exp23_s5 output
 ```
+
+It runs, in order: our 3-seed blend + rules (`src/postprocess.py`), blended scores with house-number categories
+(`dev/make_blend_scores.py`), our France house / word-swap / type-swap rules on the teammate output
+(`dev/apply_rules_to_file.py --house-rule --type-swap --societe-type`), our confident pairs the teammate output misses
+(`dev/final_adds.py`: blend ≥ 0.99, same or missing house number or empty address, record unused), and the candidate
+file (`dev/make_candidates.py`: final matches ∪ teammate matches, i.e. the pairs the rule stage evaluated).
+Verified: from our saved runs it regenerates the uploaded `output/matching_results.tsv` except 6 of 1,732,544 rows (4 pairs only in the upload, 2 only in the rebuild): the version that produced the upload paired typo-like words by iterating Python sets, whose order changes with per-process hash randomisation; the code now iterates in sorted order and is deterministic.
 
 ## Validation
 

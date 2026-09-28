@@ -6,7 +6,8 @@ sys.path.insert(0, os.path.join(_ROOT, "code", "business_entity_resolution", "sr
 import numpy as np, pandas as pd
 from normalize import load_normalized
 ap = argparse.ArgumentParser(); ap.add_argument("base"); ap.add_argument("ours"); ap.add_argument("--out", default="")
-ap.add_argument("--min-score", type=float, default=0.99); ap.add_argument("--no-empty-rows", action="store_true")
+ap.add_argument("--min-score", type=float, default=0.99)
+ap.add_argument("--scores", default=os.path.join(_ROOT, "runs", "eda", "blend_scores_cat.parquet"), help="make_blend_scores.py output"); ap.add_argument("--no-empty-rows", action="store_true")
 a = ap.parse_args()
 def rd(p): return pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False, quoting=csv.QUOTE_NONE)
 s1, pool = load_normalized(os.path.join(_ROOT, "dataset", "test"), "test", n_jobs=8)
@@ -17,7 +18,7 @@ her_rows, her_recs = set(H.i), set(H.j)
 her_pairs = set(zip(H.i.values, H.j.values))
 O = rd(a.ours)
 Op = pd.DataFrame([(ip[s], jp[x]) for s, ms in zip(O.iloc[:, 0], O.iloc[:, 1]) for x in ms.split(",") if x], columns=["i", "j"])
-b = pd.read_parquet(os.path.join(_ROOT, "runs", "eda", "blend_scores_cat.parquet"))[["i", "j", "score", "cat"]]
+b = pd.read_parquet(a.scores)[["i", "j", "score", "cat"]]
 Op = Op.merge(b, on=["i", "j"], how="left"); Op["c"] = s1.country.values[Op.i.values]
 newp = np.array([(i, j) not in her_pairs for i, j in zip(Op.i.values, Op.j.values)])
 m = (Op.score.values >= a.min_score) & Op.cat.isin(["eq", "nonum", "empty"]).values & ~Op.j.isin(her_recs).values & newp

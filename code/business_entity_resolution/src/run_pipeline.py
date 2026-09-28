@@ -297,15 +297,15 @@ def main():
     ap.add_argument("--rev-k", type=int, default=0,
                     help="reverse top-K blocking: also keep each pool record's K most similar S1 (per generator)")
     args = ap.parse_args()
-    if args.extra_gens:
-        # teammate-style blocking (reverse-engineered from her 0.9848 output, 27 Sep): separate NAME-ONLY and
-        # ADDRESS-ONLY generators reach different-name/same-address copies (France acronyms, made-up names),
-        # generic shared names with short addresses (India) and empty-address copies (US)
-        config.BLOCKING["name_c4"] = dict(space="name_c4", k=20, max_df=20000)
-        config.BLOCKING["addr_tok"] = dict(space="addr_tok", k=20, max_df=5000)
     if args.rev_k > 0:
         for g in config.BLOCKING:
             config.BLOCKING[g]["rk"] = args.rev_k
+    if args.extra_gens:
+        # teammate-style blocking (reverse-engineered from her 0.9848 output): separate NAME-ONLY and ADDRESS-ONLY
+        # generators reach different-name/same-address copies (France acronyms, made-up names), generic shared names
+        # with short addresses (India) and empty-address copies (US). Forward only (reverse on 4 spaces ran out of RAM).
+        config.BLOCKING["name_c4"] = dict(space="name_c4", k=15, max_df=20000)
+        config.BLOCKING["addr_tok"] = dict(space="addr_tok", k=15, max_df=5000)
     if args.profile == "exp17":
         config.DROP_FEATURES = ["addr_len_a", "addr_len_b", "name_len_ratio"]
         config.COUNT_CLIP = None

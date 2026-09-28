@@ -96,8 +96,8 @@ def type_swap_flags(n1s, n2s, type_words, ignore=None):
         rem, add = a - b, b - a
         if not rem or not add:
             continue
-        for r in list(rem):
-            for d in list(add):
+        for r in sorted(rem):          # sorted: set order varies with PYTHONHASHSEED
+            for d in sorted(add):
                 if Levenshtein.normalized_similarity(r, d) >= 0.5 or r in d or d in r:
                     rem.discard(r); add.discard(d); break
         if not (rem & type_words):

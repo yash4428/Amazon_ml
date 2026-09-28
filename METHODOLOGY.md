@@ -1,6 +1,6 @@
 # ML Challenge 2026: Business Entity Resolution Solution
 
-**Team Name:** [TEAM NAME]
+**Team Name:** atozml
 **Team Members:** [TEAM MEMBERS]
 **Submission Date:** 27 September 2026
 
@@ -134,7 +134,7 @@ A teammate's independent pipeline scored 0.984833. Its source code was lost, but
 The best file = that output + our house, word-swap and type-swap rules (France-only changes) + 8,605 of our own
 confident pairs (blend score ≥ 0.99, same / missing house number) that it missed (mostly native-script Indian copies
 and French acronym / made-up-name copies at the exact address). `dev/apply_rules_to_file.py` and `dev/final_adds.py`
-regenerate it from that file and our run outputs. A last attempt to also remove low-confidence shifted-number pairs from
+regenerate it from that file and our run outputs; `dev/make_best_file.sh` runs the whole chain; it regenerates the uploaded file except 6 of 1,732,544 rows (a set-iteration-order nondeterminism in the version that produced the upload, now fixed). The teammate output is shipped as `code/business_entity_resolution/inputs/teammate_matching_results.tsv`. A last attempt to also remove low-confidence shifted-number pairs from
 it lowered the score (0.988827): those pairs were mostly true copies.
 
 ---
@@ -154,7 +154,7 @@ error categories that one country accepts far more often than the others.
 ### A. Code Artefacts
 `code/business_entity_resolution/`: `README.md` (setup + commands), `requirements.txt` (pinned), `final_params.json`,
 `src/` (`config.py`, `io_utils.py`, `normalize.py`, `blocking.py`, `stage1.py`, `features.py`, `model.py`, `decide.py`,
-`postprocess.py`, `run_pipeline.py`, `sanity_check.py`), `dev/` (analysis and the best-file scripts).
+`postprocess.py`, `run_pipeline.py`, `sanity_check.py`), `dev/` (analysis scripts and the best-file chain `make_best_file.sh`), `inputs/` (the teammate model's output file, see §5.3).
 
 ### B. Licences and data
 Python 3.12; numpy, pandas, scipy, pyarrow (BSD / Apache-2.0), scikit-learn (BSD-3), LightGBM (MIT), RapidFuzz (MIT),
