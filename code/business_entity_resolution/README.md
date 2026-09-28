@@ -49,6 +49,23 @@ It runs, in order: our 3-seed blend + rules (`src/postprocess.py`), blended scor
 file (`dev/make_candidates.py`: final matches ∪ teammate matches, i.e. the pairs the rule stage evaluated).
 Verified: from our saved runs it regenerates the uploaded `output/matching_results.tsv` except 6 of 1,732,544 rows (4 pairs only in the upload, 2 only in the rebuild): the version that produced the upload paired typo-like words by iterating Python sets, whose order changes with per-process hash randomisation; the code now iterates in sorted order and is deterministic.
 
+### C. Genuine rebuild of the teammate's approach (`atozml_submission_rebuild.zip`)
+
+Everything from the raw data, no external input: our pipeline plus the teammate-style name-only and address-only
+candidate generators (`--extra-gens`, reverse-engineered from her output file), 3 seeds, blend, label-free rules.
+
+```bash
+for s in 3 4 5; do
+  .venv/bin/python code/business_entity_resolution/src/run_pipeline.py --train-dir dataset/train \
+      --test-dir dataset/test --out-dir runs/exp24_s$s --crowd 0.9 --sample-seed $s --model-s1 800000 \
+      --profile exp17 --rev-k 5 --extra-gens
+done
+.venv/bin/python code/business_entity_resolution/src/postprocess.py --run runs/exp24_s3 runs/exp24_s4 runs/exp24_s5 \
+    --params code/business_entity_resolution/final_params_rebuild.json --out output \
+    --house-rule --shift-rule US --swap-rule --type-swap-rule
+```
+(~3 h cold for the first run on 12 cores / 24 GB, ~1 h for each further seed thanks to the blocking cache.)
+
 ## Validation
 
 `evaluate.py make-split` writes `splits/<name>/{train,test}`, and the same command runs on them:

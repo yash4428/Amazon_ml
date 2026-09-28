@@ -1,0 +1,1 @@
+{"params": [0.68, 0.74, 0.0], "note": "blend of: runs/exp24_test runs/exp24s4_test runs/exp24s5_test; tuned on common OOF S1: exp24_test+exp24s4_test+exp24s5_test          0.98397 (0.68, 0.74, 0.0)"}
